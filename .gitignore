@@ -352,6 +352,13 @@ ASALocalRun/
 # MSBuild Binary and Structured Log
 *.binlog
 /.env
+/appsettings.Local.json
+/WebApplication1/appsettings.Local.json
+/WebApplication1/appsettings.Production.json
+/secrets/
+/Secrets/
+/tmp/
+/backups/
 /WebApplication1/data/
 
 # NVidia Nsight GPU debugger configuration file

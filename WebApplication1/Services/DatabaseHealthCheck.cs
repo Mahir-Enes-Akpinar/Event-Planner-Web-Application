@@ -19,11 +19,11 @@ public sealed class DatabaseHealthCheck : IHealthCheck
             var database = scope.ServiceProvider.GetRequiredService<Context>();
             return await database.Database.CanConnectAsync(cancellationToken)
                 ? HealthCheckResult.Healthy()
-                : HealthCheckResult.Unhealthy("SQL Server bağlantısı kurulamadı.");
+                : HealthCheckResult.Unhealthy("Database connection could not be established.");
         }
         catch (Exception exception)
         {
-            return HealthCheckResult.Unhealthy("SQL Server sağlık kontrolü başarısız.", exception);
+            return HealthCheckResult.Unhealthy("Database health check failed.", exception);
         }
     }
 }

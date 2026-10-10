@@ -7,10 +7,12 @@ public sealed class DesignTimeContextFactory : IDesignTimeDbContextFactory<Conte
 {
     public Context CreateDbContext(string[] args)
     {
+        AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-            ?? "Server=(localdb)\\mssqllocaldb;Database=EventPlannerDesign;Trusted_Connection=True;TrustServerCertificate=True";
+            ?? "Host=localhost;Port=5432;Database=EventPlannerDesign;Username=postgres;Password=postgres";
         var options = new DbContextOptionsBuilder<Context>()
-            .UseSqlServer(connectionString)
+            .UseNpgsql(connectionString)
             .Options;
         return new Context(options);
     }

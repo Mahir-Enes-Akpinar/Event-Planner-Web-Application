@@ -29,11 +29,17 @@ public class Context : IdentityDbContext<Kullanici, IdentityRole<int>, int>
         {
             entity.ToTable("Kullanicilar");
             entity.HasQueryFilter(user => !user.IsDeleted);
+            entity.Property(user => user.RowVersion)
+                .IsConcurrencyToken()
+                .ValueGeneratedNever();
         });
 
         modelBuilder.Entity<Etkinlik>(entity =>
         {
             entity.HasQueryFilter(item => !item.IsDeleted && !item.CreatedByUser.IsDeleted);
+            entity.Property(item => item.RowVersion)
+                .IsConcurrencyToken()
+                .ValueGeneratedNever();
             entity.HasOne(item => item.CreatedByUser).WithMany()
                 .HasForeignKey(item => item.CreatedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -105,9 +111,36 @@ public class Context : IdentityDbContext<Kullanici, IdentityRole<int>, int>
             entity.HasIndex(item => new { item.KullaniciId, item.Reason, item.SourceId }).IsUnique();
             entity.HasIndex(item => new { item.KullaniciId, item.Reason })
                 .IsUnique()
-                .HasFilter("[Reason] = 2 AND [RevokedAtUtc] IS NULL");
+                .HasFilter("\"Reason\" = 2 AND \"RevokedAtUtc\" IS NULL");
             entity.HasOne(item => item.Kullanici).WithMany(user => user.Scores)
                 .HasForeignKey(item => item.KullaniciId).OnDelete(DeleteBehavior.Restrict);
         });
+    }
+
+    public override int SaveChanges()
+    {
+        UpdateConcurrencyTokens();
+        return base.SaveChanges();
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        UpdateConcurrencyTokens();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void UpdateConcurrencyTokens()
+    {
+        foreach (var entry in ChangeTracker.Entries<Etkinlik>())
+        {
+            if (entry.State is EntityState.Added or EntityState.Modified)
+                entry.Property(item => item.RowVersion).CurrentValue = Guid.NewGuid().ToByteArray();
+        }
+
+        foreach (var entry in ChangeTracker.Entries<Kullanici>())
+        {
+            if (entry.State is EntityState.Added or EntityState.Modified)
+                entry.Property(item => item.RowVersion).CurrentValue = Guid.NewGuid().ToByteArray();
+        }
     }
 }

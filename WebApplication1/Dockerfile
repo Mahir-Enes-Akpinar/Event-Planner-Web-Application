@@ -17,5 +17,4 @@ COPY --from=build /app/publish .
 RUN mkdir -p /app/data/uploads /app/data/keys && chown -R app:app /app/data
 USER app
 EXPOSE 8080
-ENV ASPNETCORE_URLS=http://+:8080
 ENTRYPOINT ["dotnet", "WebApplication1.dll"]
