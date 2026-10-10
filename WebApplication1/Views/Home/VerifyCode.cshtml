@@ -17,16 +17,12 @@
             <div class="alert alert-danger">@ViewBag.Error</div>
         }
 
-        <form method="post" action="/Home/VerifyCode">
+        <form method="post" asp-action="VerifyCode" asp-controller="Home">
             <input type="hidden" name="email" value="@ViewData["Email"]" />
-
-            <div class="form-group mb-3">
-                <label for="verificationCode" class="form-label">Doğrulama Kodu</label>
-                <input type="text" class="form-control" id="verificationCode" name="verificationCode" placeholder="Doğrulama kodunu giriniz" required>
-            </div>
+            <input type="hidden" name="verificationCode" value="@ViewData["Token"]" />
             <div class="form-group mb-3">
                 <label for="newPassword" class="form-label">Yeni Şifre</label>
-                <input type="password" class="form-control" id="newPassword" name="newPassword" placeholder="Yeni şifrenizi giriniz" required>
+                <input type="password" class="form-control" id="newPassword" name="newPassword" minlength="10" autocomplete="new-password" required>
             </div>
             <button type="submit" class="btn btn-success btn-block shadow">Şifreyi Yenile</button>
         </form>

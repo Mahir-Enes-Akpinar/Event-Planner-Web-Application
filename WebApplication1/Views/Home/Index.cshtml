@@ -1,94 +1,117 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@{
+    ViewData["Title"] = "Etkinlik Platformu";
+    Layout = null;
 }
-
-
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    <link rel="stylesheet" href="~/css/style.css">
-    <title>Login or Register</title>
-
-    <!-- Hata Measj teaster entegre-->
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
-
-
-
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Etkinlik Platformu</title>
+    <style>
+        :root { --ink:#172033; --muted:#707b91; --primary:#635bff; --dark:#262d68; --line:#e5e8f0; }
+        * { box-sizing:border-box; }
+        body { margin:0; min-height:100vh; display:grid; place-items:center; padding:24px; color:var(--ink); font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; background:linear-gradient(135deg,#f2f4ff,#eef5ff 48%,#fbfbfd); }
+        .shell { width:min(1060px,100%); min-height:650px; display:grid; grid-template-columns:.86fr 1.14fr; overflow:hidden; border-radius:28px; background:#fff; box-shadow:0 24px 80px rgba(31,45,82,.16); }
+        .intro { position:relative; overflow:hidden; padding:50px; color:#fff; background:linear-gradient(145deg,var(--dark),#625bff); }
+        .intro:after { content:""; position:absolute; width:370px; height:370px; right:-180px; bottom:-145px; border:62px solid rgba(255,255,255,.1); border-radius:50%; }
+        .brand { display:flex; align-items:center; gap:12px; font-weight:800; }
+        .brand-mark { display:grid; place-items:center; width:42px; height:42px; border-radius:14px; color:var(--primary); background:#fff; }
+        .intro-copy { position:relative; z-index:1; margin-top:135px; }
+        .intro h1 { max-width:410px; margin:10px 0 18px; font-size:clamp(2.4rem,4vw,4.1rem); line-height:1.02; letter-spacing:-.055em; }
+        .intro p { max-width:410px; margin:0; color:rgba(255,255,255,.8); line-height:1.7; }
+        .benefits { display:grid; gap:14px; margin-top:34px; color:rgba(255,255,255,.92); font-size:.92rem; }
+        .benefits span { display:flex; align-items:center; gap:10px; }
+        .benefits b { display:grid; place-items:center; width:25px; height:25px; border-radius:50%; background:rgba(255,255,255,.17); }
+        .auth { padding:48px clamp(24px,6vw,70px); }
+        .auth-header { margin-bottom:22px; }
+        .eyebrow { color:var(--primary); font-size:.76rem; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
+        .auth h2 { margin:8px 0; font-size:2rem; letter-spacing:-.045em; }
+        .auth-header p,.panel-subtitle { margin:0; color:var(--muted); }
+        .alert { padding:12px 14px; margin-bottom:16px; border-radius:12px; font-size:.88rem; }
+        .alert-danger { color:#982b3a; border:1px solid #ffd2d9; background:#fff1f3; }
+        .alert-success { color:#146c43; border:1px solid #c8f1d9; background:#edfff5; }
+        .switcher { display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:4px; margin:20px 0 22px; border-radius:14px; background:#f1f3f9; }
+        .switcher button { height:40px; border:0; border-radius:10px; color:var(--muted); background:transparent; font:700 .86rem inherit; cursor:pointer; }
+        .switcher button.active { color:var(--ink); background:#fff; box-shadow:0 4px 12px rgba(31,45,82,.1); }
+        .forms-window { overflow:hidden; width:100%; }
+        .forms-track { display:flex; width:200%; transition:transform .45s cubic-bezier(.2,.8,.2,1); }
+        .forms-track.register-active { transform:translateX(-50%); }
+        .form-panel { width:50%; flex:0 0 50%; padding:2px 2px 0; }
+        .form-panel h3 { margin:0 0 6px; font-size:1.2rem; }
+        label { display:block; margin:0 0 7px; color:#3e485e; font-size:.82rem; font-weight:700; }
+        input { width:100%; height:46px; padding:0 13px; border:1px solid #dfe3ed; border-radius:12px; outline:0; color:var(--ink); background:#fff; font:inherit; transition:border-color .2s,box-shadow .2s; }
+        input:focus { border-color:var(--primary); box-shadow:0 0 0 4px rgba(99,91,255,.12); }
+        .field { margin:0 0 15px; }
+        .password-note,.hint { color:var(--muted); font-size:.76rem; line-height:1.5; }
+        .password-note { margin:-4px 0 15px; }
+        .check { display:flex; align-items:center; gap:8px; margin:2px 0 16px; color:var(--muted); font-size:.78rem; font-weight:500; }
+        .check input { width:15px; height:15px; }
+        .primary-button { width:100%; height:46px; border:0; border-radius:12px; color:#fff; background:var(--primary); font:700 .9rem inherit; cursor:pointer; transition:background .2s,transform .2s; }
+        .primary-button:hover { background:#4e46d9; transform:translateY(-1px); }
+        .forgot { display:block; margin:0 0 16px; color:var(--primary); font-size:.8rem; text-align:right; text-decoration:none; }
+        .hint { margin:18px 0 0; }
+        @@media (max-width:820px) { body { padding:12px; } .shell { grid-template-columns:1fr; } .intro { min-height:330px; padding:32px; } .intro-copy { margin-top:65px; } .auth { padding:32px 24px 38px; } }
+        @@media (max-width:480px) { .intro h1 { font-size:2.55rem; } .auth h2 { font-size:1.65rem; } }
+    </style>
 </head>
-
 <body>
-    <script>
-        $(document).ready(function () {
-        @if (TempData["SuccessMessage"] != null)
-        {
-            <text>
-                        toastr.success('@TempData["SuccessMessage"]', 'Başarılı');
-            </text>
-        }
-        @if (TempData["ErrorMessage"] != null)
-        {
-            <text>
-                        toastr.error('@TempData["ErrorMessage"]', 'Hata');
-            </text>
-        }
-            });
-    </script>
-
-    <div class="container" id="container">
-        <!-- Sign Up Form -->
-        <div class="form-container sign-up">
-            <form asp-action="Register"   method="post"  enctype="multipart/form-data">
-                <h1>Hesap Oluşturma</h1>
-                
-                <input type="text" name="UserName" placeholder="User Name" required>
-                <input type="email" name="Email" placeholder="Email" required>
-                <input type="password" name="Password" placeholder="Password" required>
-                <input type="text" name="FirstName" placeholder="Ad">
-                <input type="text" name="LastName" placeholder="Soyad">
-                <input type="date" name="BirthDate" placeholder="Doğum Tarihi">
-                <input type="text" name="Location" placeholder="Adrres">
-                <input type="text" name="Gender" placeholder="Cinsiyet">
-                <input type="tel" name="PhoneNumber" placeholder="Telefon Numarası">
-                <input type="file" name="Image" accept="image/*"> <!-- Resim yükleme -->
-                <button type="submit">Kayıt Ol</button>
-            </form>
-        </div>
-
-        <!-- Sign In Form -->
-        <div class="form-container sign-in">
-            <form method="post" action="/Home/Login">
-                <h1>Giriş</h1>
-                <input type="text" name="UserName" placeholder="Kullanıcı Adı" required>
-                <input type="password" name="Password" placeholder="Şifre" required>
-                <a href="/Home/ForgotPassword">Forget Your Password?</a>
-                <button type="submit">Giriş</button>
-            </form>
-        </div>
-
-        <div class="toggle-container">
-            <div class="toggle">
-                <div class="toggle-panel toggle-left">
-                    <h1>Hoşgeldin!</h1>
-                    <p>Etkinlik Platforma giriş yapmak için kulanıcı adı ve şifrenizi girin</p>
-                    <button class="hidden" id="login">Giriş</button>
-                </div>
-                <div class="toggle-panel toggle-right">
-                    <h1>MERHABA!</h1>
-                    <p>Etkinlik platformunu kullanmka için kişisel bilgilerinizle kayıt olun</p>
-                    <button class="hidden" id="register">Kayıt Ol</button>
+    <main class="shell">
+        <section class="intro" aria-label="Etkinlik Platformu">
+            <div class="brand"><span class="brand-mark">✦</span><span>Etkinlik Platformu</span></div>
+            <div class="intro-copy">
+                <div class="eyebrow" style="color:#c9c6ff">Şehrindeki etkinlikleri keşfet</div>
+                <h1>Bir sonraki güzel anını planla.</h1>
+                <p>İlgi alanlarına uygun etkinlikleri bul, kendi etkinliğini oluştur ve topluluğa katıl.</p>
+                <div class="benefits"><span><b>✓</b> Yakınındaki etkinlikleri keşfet</span><span><b>✓</b> Katıldıkça puan kazan</span><span><b>✓</b> Güvenli ve modern deneyim</span></div>
+            </div>
+        </section>
+        <section class="auth">
+            <header class="auth-header"><div class="eyebrow">Hoş geldin</div><h2>Etkinliklere katılmaya hazır mısın?</h2><p>Giriş yap veya yeni hesabını oluştur.</p></header>
+            @if (TempData["ErrorMessage"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
+            @if (TempData["SuccessMessage"] is string success) { <div class="alert alert-success" role="alert">@success</div> }
+            <div class="switcher" role="tablist" aria-label="Kimlik doğrulama seçenekleri">
+                <button type="button" class="active" data-auth-tab="login" role="tab">Giriş yap</button>
+                <button type="button" data-auth-tab="register" role="tab">Kayıt ol</button>
+            </div>
+            <div class="forms-window">
+                <div class="forms-track" id="formsTrack">
+                    <div class="form-panel" data-auth-panel="login">
+                        <h3>Hesabına giriş yap</h3><p class="panel-subtitle">Etkinliklerine kaldığın yerden devam et.</p>
+                        <form asp-action="Login" asp-controller="Home" method="post" style="margin-top:22px">
+                            <div class="field"><label for="loginUserName">Kullanıcı adı</label><input id="loginUserName" name="UserName" autocomplete="username" required></div>
+                            <div class="field"><label for="loginPassword">Şifre</label><input id="loginPassword" name="Password" type="password" autocomplete="current-password" required></div>
+                            <a class="forgot" asp-action="ForgotPassword">Şifremi unuttum</a><button class="primary-button" type="submit">Giriş yap</button>
+                        </form>
+                    </div>
+                    <div class="form-panel" data-auth-panel="register">
+                        <h3>Yeni hesap oluştur</h3><p class="panel-subtitle">İlk adım için üç bilgi yeterli.</p>
+                        <form asp-action="Register" asp-controller="Home" method="post" style="margin-top:22px">
+                            <div class="field"><label for="registerUserName">Kullanıcı adı</label><input id="registerUserName" name="UserName" minlength="3" maxlength="50" autocomplete="username" required></div>
+                            <div class="field"><label for="registerEmail">E-posta</label><input id="registerEmail" name="Email" type="email" maxlength="256" autocomplete="email" required></div>
+                            <div class="field"><label for="registerPassword">Şifre</label><input id="registerPassword" name="Password" type="password" minlength="10" maxlength="128" autocomplete="new-password" required></div>
+                            <div class="password-note">En az 10 karakter; büyük harf, küçük harf, rakam ve özel karakter içermeli.</div>
+                            <label class="check"><input type="checkbox" data-password-toggle="registerPassword"> Şifreyi göster</label>
+                            <button class="primary-button" type="submit">Ücretsiz kayıt ol</button>
+                            <p class="hint">Kayıttan sonra profilinden ad, konum, doğum tarihi ve diğer bilgilerini tamamlayabilirsin.</p>
+                        </form>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <script src="~/js/script.js"></script>
+        </section>
+    </main>
+    <script>
+        const track = document.getElementById('formsTrack');
+        document.querySelectorAll('[data-auth-tab]').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                const register = tab.dataset.authTab === 'register';
+                track.classList.toggle('register-active', register);
+                document.querySelectorAll('[data-auth-tab]').forEach(function (item) { item.classList.toggle('active', item === tab); });
+            });
+        });
+        document.querySelectorAll('[data-password-toggle]').forEach(function (toggle) {
+            toggle.addEventListener('change', function () { document.getElementById(toggle.dataset.passwordToggle).type = toggle.checked ? 'text' : 'password'; });
+        });
+    </script>
 </body>
-
 </html>

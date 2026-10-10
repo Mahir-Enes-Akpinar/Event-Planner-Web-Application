@@ -1,129 +1,209 @@
-﻿@model WebApplication1.Models.Etkinlik
+@model WebApplication1.Models.Etkinlik
+@inject IConfiguration Configuration
+@using System.Text.Json
 @{
-    ViewData["Title"] = "Etkinlik Ekle";
+    ViewData["Title"] = "Etkinlik oluştur";
     Layout = "~/Views/Shared/UserLayout.cshtml";
+    var categories = ViewBag.Categories as IEnumerable<Kategori> ?? Enumerable.Empty<Kategori>();
+}
+<link rel="stylesheet" href="~/vendor/leaflet/leaflet.css">
+<style>
+    .event-create-shell{max-width:1120px;margin:0 auto}.event-create-hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#6d5dfc 0%,#ff6b6b 58%,#ffb703 100%);color:#fff;border-radius:26px;padding:2.1rem;margin-bottom:1.25rem;box-shadow:0 22px 50px rgba(255,107,107,.24)}.event-create-hero:after{content:"";position:absolute;inset:auto 0 0 0;height:6px;background:linear-gradient(90deg,#0fb9b1,#fff,#8b5cf6)}.event-create-hero h1{font-weight:850;letter-spacing:-.035em}.event-form-card{background:rgba(255,255,255,.96);border:1px solid #f0e9ff;border-radius:24px;padding:1.6rem;box-shadow:0 18px 42px rgba(51,35,114,.09)}.section-label{display:inline-flex;align-items:center;gap:.65rem;color:#6d5dfc;font-size:.78rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase;margin-bottom:1rem}.section-label:before{content:"";flex:0 0 34px;width:34px;height:9px;border-radius:999px;background:radial-gradient(circle at 4px 50%,#ff6b6b 0 4px,transparent 4.5px),radial-gradient(circle at 17px 50%,#ffb703 0 4px,transparent 4.5px),radial-gradient(circle at 30px 50%,#0fb9b1 0 4px,transparent 4.5px)}.form-label{color:#26314d}.form-control,.form-select{border-radius:13px;padding:.76rem .95rem;border-color:#ded8f3;background:#fffdfa}.form-control:focus,.form-select:focus{border-color:#ff6b6b;box-shadow:0 0 0 .22rem rgba(255,107,107,.14)}#map{height:350px;border-radius:18px;overflow:hidden;border:2px solid #e7e0ff;box-shadow:0 14px 30px rgba(51,35,114,.08)}.location-hint{color:#6d7488;font-size:.88rem}.submit-event{border:0;border-radius:13px;padding:.84rem 1.35rem;font-weight:800;background:linear-gradient(135deg,#6d5dfc,#8b5cf6 45%,#ff6b6b);color:#fff;box-shadow:0 12px 26px rgba(109,93,252,.24);transition:transform .2s,box-shadow .2s}.submit-event:hover{transform:translateY(-1px);box-shadow:0 16px 32px rgba(255,107,107,.25)}.btn-light{border:1px solid #eee7ff;background:#fff;color:#59657b}.address-picker{position:relative}.address-suggestions{position:absolute;z-index:1000;left:0;right:0;top:100%;background:#fff;border:1px solid #ded8f3;border-radius:0 0 13px 13px;box-shadow:0 14px 28px rgba(51,35,114,.14);overflow:hidden;max-height:230px;overflow-y:auto}.address-suggestions button{display:block;width:100%;border:0;background:#fff;text-align:left;padding:.72rem .95rem;font-size:.9rem}.address-suggestions button:hover{background:#fff1f2;color:#e11d48}.address-preview{background:linear-gradient(135deg,#fff7ed,#eefdfb);border:1px solid #d9f3ee;border-radius:14px;padding:.78rem .95rem;color:#26314d;font-size:.9rem}
+</style>
+<main class="container py-4 event-create-shell">
+    <div class="event-create-hero"><div class="small text-white-50 mb-2">ETKİNLİK STÜDYOSU</div><h1 class="mb-2">Topluluğunu bir araya getir</h1><p class="mb-0 text-white-50">Detayları ekle, adresi haritadan seç veya kendin yaz. Gönderdikten sonra yönetici onayına iletilecek.</p></div>
+    @if (TempData["ErrorMessage"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
+    <form asp-action="AddEvent" method="post" enctype="multipart/form-data" class="event-form-card">
+        <div class="section-label">Temel bilgiler</div><div class="row g-3">
+            <div class="col-md-8"><label for="Name" class="form-label fw-semibold">Etkinlik adı</label><input class="form-control" id="Name" name="Name" maxlength="100" placeholder="Örn. Hafta sonu doğa yürüyüşü" required></div>
+            <div class="col-md-4"><label for="Category" class="form-label fw-semibold">Kategori</label><select class="form-select" id="Category" name="selectedCategoryId" required><option value="">Kategori seçin</option>@foreach (var category in categories) { <option value="@category.Id">@category.Name</option> }</select></div>
+            <div class="col-12"><label for="Description" class="form-label fw-semibold">Açıklama <span class="text-muted fw-normal">(isteğe bağlı)</span></label><textarea class="form-control" id="Description" name="Description" rows="4" maxlength="500" placeholder="Etkinliği kısaca anlatın"></textarea></div>
+            <div class="col-12"><label for="DetailedProgram" class="form-label fw-semibold">Detaylı program <span class="text-muted fw-normal">(topluluk sayfasında görünür)</span></label><textarea class="form-control" id="DetailedProgram" name="DetailedProgram" rows="5" maxlength="3000" placeholder="Örn. 10:00 buluşma, 10:30 başlangıç, 12:00 mola, 14:00 kapanış..."></textarea><div class="form-text">Katılan kullanıcılar topluluk sayfasında bu programı ve sohbeti görebilir.</div></div>
+            <div class="col-md-8"><label for="Image" class="form-label fw-semibold">Kapak görseli <span class="text-muted fw-normal">(isteğe bağlı)</span></label><input type="file" class="form-control" id="Image" name="Image" accept="image/jpeg,image/png,image/webp"></div>
+            <div class="col-md-4"><label for="MaxParticipants" class="form-label fw-semibold">Katılım kontenjanı</label><input type="number" class="form-control" id="MaxParticipants" name="MaxParticipants" min="1" max="100000" placeholder="Sınırsız"><div class="form-text">Boş bırakırsan sınırsız olur.</div></div>
+        </div><hr class="my-4"><div class="section-label">Tarih ve süre</div><div class="row g-3">
+            <div class="col-md-6"><label for="Date" class="form-label fw-semibold">Başlangıç tarihi</label><input type="datetime-local" class="form-control" id="Date" name="Date" required></div>
+            <div class="col-md-3"><label for="DurationHours" class="form-label fw-semibold">Süre (saat)</label><input type="number" class="form-control" id="DurationHours" name="DurationHours" min="0" max="23" value="1" required></div>
+            <div class="col-md-3"><label for="DurationMinutes" class="form-label fw-semibold">Süre (dakika)</label><input type="number" class="form-control" id="DurationMinutes" name="DurationMinutes" min="0" max="59" value="0" required></div>
+        </div><hr class="my-4"><div class="section-label">Konum</div>
+        <div class="row g-3">
+            <div class="col-md-3 address-picker"><label for="City" class="form-label fw-semibold">Şehir</label><input autocomplete="off" class="form-control location-part" id="City" placeholder="İstanbul" required data-level="city"><div class="address-suggestions" hidden></div></div>
+            <div class="col-md-3 address-picker"><label for="District" class="form-label fw-semibold">İlçe</label><input autocomplete="off" class="form-control location-part" id="District" placeholder="Kadıköy" required data-level="district"><div class="address-suggestions" hidden></div></div>
+            <div class="col-md-3 address-picker"><label for="Neighborhood" class="form-label fw-semibold">Mahalle</label><input autocomplete="off" class="form-control location-part" id="Neighborhood" placeholder="Caferağa" data-level="neighborhood"><div class="address-suggestions" hidden></div></div>
+            <div class="col-md-3 address-picker"><label for="Street" class="form-label fw-semibold">Sokak / cadde</label><input autocomplete="off" class="form-control location-part" id="Street" placeholder="Moda Caddesi" data-level="street"><div class="address-suggestions" hidden></div></div>
+        </div>
+        <div class="address-preview mt-3" id="AddressPreview">Adres seçildikçe burada birleşik adres görünecek.</div>
+        <div class="location-hint my-3">Türkiye içinden sırayla şehir, ilçe, mahalle ve sokak seç. İstersen haritaya tıklayarak konumu hassaslaştırabilirsin.</div>
+        <input type="hidden" id="Address" name="Address" value=""><input type="hidden" id="Latitude" name="Latitude" value="0"><input type="hidden" id="Longitude" name="Longitude" value="0"><div id="map" aria-label="Etkinlik konumu haritası"></div>
+        <div class="d-flex justify-content-end align-items-center gap-3 mt-4"><a class="btn btn-light" asp-controller="User" asp-action="Index">Vazgeç</a><button class="submit-event" type="submit">Etkinliği onaya gönder</button></div>
+    </form>
+</main>
+@section Scripts {
+<script src="~/vendor/leaflet/leaflet.js"></script>
+<script>
+const map = L.map('map').setView([39, 35], 6);
+L.tileLayer('/map-tiles/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+}).addTo(map);
+setTimeout(() => map.invalidateSize(), 150);
+
+let marker;
+let searchTimer;
+const fields = {
+    city: document.getElementById('City'),
+    district: document.getElementById('District'),
+    neighborhood: document.getElementById('Neighborhood'),
+    street: document.getElementById('Street')
+};
+const addressInput = document.getElementById('Address');
+const preview = document.getElementById('AddressPreview');
+
+function composeQuery(level) {
+    const parts = [];
+    if (level !== 'city' && fields.city.value.trim()) parts.push(fields.city.value.trim());
+    if ((level === 'neighborhood' || level === 'street') && fields.district.value.trim()) parts.push(fields.district.value.trim());
+    if (level === 'street' && fields.neighborhood.value.trim()) parts.push(fields.neighborhood.value.trim());
+    parts.push(fields[level].value.trim());
+    return parts.filter(Boolean).join(' ');
 }
 
-<head>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bokor&family=Itim&family=Protest+Revolution&display=swap" rel="stylesheet">
-    <!-- Bootstrap JavaScript -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+function composeAddress() {
+    const parts = [fields.street.value, fields.neighborhood.value, fields.district.value, fields.city.value]
+        .map(value => value.trim())
+        .filter(Boolean);
+    const address = parts.join(', ');
+    addressInput.value = address;
+    preview.textContent = address || 'Adres seçildikçe burada birleşik adres görünecek.';
+}
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="stylesheet" href="~/css/style4.css">
- 
-</head>
-<div class="container mt-5">
-    <script>
-        $(document).ready(function () {
-        @if (TempData["SuccessMessage"] != null)
-        {
-            <text>
-                        toastr.success('@TempData["SuccessMessage"]', 'Başarılı');
-            </text>
-        }
-        @if (TempData["ErrorMessage"] != null)
-        {
-            <text>
-                        toastr.error('@TempData["ErrorMessage"]', 'Hata');
-            </text>
-        }
-                    });
-    </script>
-    <h1 class="mb-4">Etkinlik Ekle</h1>
+function setMap(latitude, longitude, zoom = 15) {
+    document.getElementById('Latitude').value = latitude;
+    document.getElementById('Longitude').value = longitude;
+    marker ??= L.marker([latitude, longitude]).addTo(map);
+    marker.setLatLng([latitude, longitude]);
+    map.setView([latitude, longitude], zoom);
+}
 
-    <form asp-action="AddEvent" method="post" enctype="multipart/form-data">
-        <div class="mb-3">
-            <label for="Name" class="form-label">Etkinlik Adı</label>
-            <input type="text" class="form-control" id="Name" name="Name" required>
-        </div>
-
-        <div class="mb-3">
-            <label for="Description" class="form-label">Açıklama</label>
-            <textarea class="form-control" id="Description" name="Description"></textarea>
-        </div>
-        <div class="mb-3">
-            <label for="Image" class="form-label">Resim Ekle</label>
-            <input type="file" class="form-control" id="Image" name="Image" accept="image/*" required>
-        </div>
-
-        <div class="mb-3">
-            <label for="Category" class="form-label">Kategori</label>
-            <select class="form-select" id="Category" name="selectedCategoryId" required>
-                <option value="" disabled selected>Kategori seçin</option>
-                @foreach (var category in ViewBag.Categories as List<WebApplication1.Models.Kategori>)
-                {
-                    <option value="@category.Id">@category.Name</option>
-                }
-            </select>
-        </div>
-
-        <div class="mb-3">
-            <label for="Date" class="form-label">Tarih</label>
-            <input type="datetime-local" class="form-control" id="Date" name="Date" required>
-        </div>
-
-        <div class="mb-3">
-            <label for="DurationHours" class="form-label">Süre (Saat)</label>
-            <input type="number" class="form-control" id="DurationHours" name="DurationHours" min="0" required>
-        </div>
-
-        <div class="mb-3">
-            <label for="DurationMinutes" class="form-label">Süre (Dakika)</label>
-            <input type="number" class="form-control" id="DurationMinutes" name="DurationMinutes" min="0" max="59" required>
-        </div>
-
-        <div class="mb-3">
-            <label for="map" class="form-label">Konum Seç</label>
-            <div id="map" style="height: 400px; width: 100%;"></div>
-            <input type="hidden" id="Location" name="Location" required>
-            <input type="text" id="Address" name="Address" class="form-control mt-2" placeholder="Seçilen adres burada görünecek" readonly>
-        </div>
-        <button type="submit" class="btn btn-primary">Etkinlik Ekle</button>
-    </form>
-</div>
-
-<!-- Google Maps API -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRXYjVWKwDEIRF1bA9JeCLsI78Nc9ycrk&callback=initMap" async defer></script>
-
-<script>
-    let map, marker, geocoder;
-
-    function initMap() {
-        geocoder = new google.maps.Geocoder();
-
-        map = new google.maps.Map(document.getElementById("map"), {
-            center: { lat: 39.92077, lng: 32.85411 }, // Ankara, Türkiye koordinatları
-            zoom: 6,
-        });
-
-        map.addListener("click", (event) => {
-            const latLng = event.latLng;
-
-            // Marker oluştur veya taşı
-            if (!marker) {
-                marker = new google.maps.Marker({
-                    position: latLng,
-                    map: map,
-                });
-            } else {
-                marker.setPosition(latLng);
-            }
-
-            // Latitude ve Longitude'u gizli inputa yaz
-            document.getElementById("Location").value = `${latLng.lat()},${latLng.lng()}`;
-
-            // Geocoding servisiyle adresi al
-            geocoder.geocode({ location: latLng }, (results, status) => {
-                if (status === "OK" && results[0]) {
-                    document.getElementById("Address").value = results[0].formatted_address;
-                } else {
-                    document.getElementById("Address").value = "Adres alınamadı.";
-                }
-            });
-        });
+function clearLowerFields(level) {
+    if (level === 'city') {
+        fields.district.value = '';
+        fields.neighborhood.value = '';
+        fields.street.value = '';
     }
+    if (level === 'district') {
+        fields.neighborhood.value = '';
+        fields.street.value = '';
+    }
+    if (level === 'neighborhood') fields.street.value = '';
+}
+
+function applyLocationResult(result, level) {
+    if (level === 'city') fields.city.value = result.city || fields.city.value;
+    if (level === 'district') {
+        fields.city.value = result.city || fields.city.value;
+        fields.district.value = result.district || fields.district.value;
+    }
+    if (level === 'neighborhood') {
+        fields.city.value = result.city || fields.city.value;
+        fields.district.value = result.district || fields.district.value;
+        fields.neighborhood.value = result.neighborhood || fields.neighborhood.value;
+    }
+    if (level === 'street') {
+        fields.city.value = result.city || fields.city.value;
+        fields.district.value = result.district || fields.district.value;
+        fields.neighborhood.value = result.neighborhood || fields.neighborhood.value;
+        fields.street.value = result.street || fields.street.value;
+    }
+
+    composeAddress();
+    setMap(result.latitude, result.longitude);
+}
+
+function labelFor(result, level) {
+    if (level === 'city') return result.city || result.displayName;
+    if (level === 'district') return result.district || result.displayName;
+    if (level === 'neighborhood') return result.neighborhood || result.displayName;
+    return result.street || result.displayName;
+}
+
+document.querySelectorAll('.location-part').forEach(input => {
+    input.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        const level = input.dataset.level;
+        const suggestions = input.parentElement.querySelector('.address-suggestions');
+        composeAddress();
+        clearLowerFields(level);
+
+        const query = composeQuery(level);
+        if (query.length < 3) {
+            suggestions.hidden = true;
+            return;
+        }
+
+        searchTimer = setTimeout(async () => {
+            try {
+                const response = await fetch(`/api/locations/search?q=${encodeURIComponent(query)}`);
+                if (!response.ok) return;
+                const results = await response.json();
+                suggestions.innerHTML = '';
+                const seen = new Set();
+
+                results.forEach(result => {
+                    const label = labelFor(result, level);
+                    if (!label || seen.has(label.toLocaleLowerCase('tr-TR'))) return;
+                    seen.add(label.toLocaleLowerCase('tr-TR'));
+
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.textContent = label;
+                    button.title = result.displayName;
+                    button.addEventListener('click', () => {
+                        input.value = label;
+                        applyLocationResult(result, level);
+                        suggestions.hidden = true;
+                    });
+                    suggestions.appendChild(button);
+                });
+
+                suggestions.hidden = suggestions.childElementCount === 0;
+            } catch {
+                suggestions.hidden = true;
+            }
+        }, 300);
+    });
+});
+
+document.addEventListener('click', event => {
+    if (!event.target.closest('.address-picker')) {
+        document.querySelectorAll('.address-suggestions').forEach(item => item.hidden = true);
+    }
+});
+
+map.on('click', async event => {
+    setMap(event.latlng.lat, event.latlng.lng, 16);
+    try {
+        const response = await fetch(`/api/locations/reverse?lat=${event.latlng.lat}&lon=${event.latlng.lng}`);
+        if (!response.ok) return;
+        const result = await response.json();
+        fields.city.value = result.city || fields.city.value;
+        fields.district.value = result.district || fields.district.value;
+        fields.neighborhood.value = result.neighborhood || fields.neighborhood.value;
+        fields.street.value = result.street || fields.street.value;
+        addressInput.value = result.displayName;
+        preview.textContent = result.displayName;
+    } catch { }
+});
+
+document.querySelector('form.event-form-card').addEventListener('submit', event => {
+    composeAddress();
+    const latitude = Number(document.getElementById('Latitude').value);
+    const longitude = Number(document.getElementById('Longitude').value);
+    if (!addressInput.value.trim() || (latitude === 0 && longitude === 0)) {
+        event.preventDefault();
+        preview.textContent = 'Lütfen adresi önerilerden seç veya haritaya tıklayarak konumu belirle.';
+        fields.city.focus();
+    }
+});
 </script>
+}

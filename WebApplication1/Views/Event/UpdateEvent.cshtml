@@ -1,135 +1,93 @@
-﻿@model WebApplication1.Models.Etkinlik
-
+@model WebApplication1.Models.Etkinlik
+@inject IConfiguration Configuration
+@using System.Text.Json
 @{
     ViewData["Title"] = "Etkinlik Güncelle";
     Layout = "~/Views/Shared/UserLayout.cshtml";
+    var categories = ViewBag.Categories as IEnumerable<Kategori> ?? Enumerable.Empty<Kategori>();
+    var selectedCategory = Model.EventCategories.FirstOrDefault()?.KategoriId;
 }
-<head>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bokor&family=Itim&family=Protest+Revolution&display=swap" rel="stylesheet">
-    <!-- Bootstrap JavaScript -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<link rel="stylesheet" href="~/vendor/leaflet/leaflet.css">
+<style>
+    .edit-shell{max-width:1120px;margin:0 auto}
+    .edit-hero{position:relative;overflow:hidden;margin-bottom:18px;padding:28px;border:1px solid rgba(255,255,255,.76);border-radius:28px;background:linear-gradient(135deg,rgba(255,255,255,.74),rgba(255,255,255,.38));box-shadow:0 24px 60px rgba(51,35,114,.12);backdrop-filter:blur(20px)}
+    .edit-hero h1{margin:0;font-weight:900;letter-spacing:-.045em}
+    .edit-hero p{margin:8px 0 0;color:var(--muted)}
+    .edit-card{padding:24px;border:1px solid rgba(255,255,255,.8);border-radius:26px;background:rgba(255,255,255,.72);box-shadow:0 22px 54px rgba(51,35,114,.1);backdrop-filter:blur(20px)}
+    .section-label{display:inline-flex;align-items:center;gap:.65rem;margin-bottom:14px;color:#6d5dfc;font-size:.78rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase}
+    .section-label:before{content:"";flex:0 0 34px;width:34px;height:9px;border-radius:999px;background:radial-gradient(circle at 4px 50%,#ff6b6b 0 4px,transparent 4.5px),radial-gradient(circle at 17px 50%,#ffb703 0 4px,transparent 4.5px),radial-gradient(circle at 30px 50%,#0fb9b1 0 4px,transparent 4.5px)}
+    .form-label{color:#26314d}.form-control,.form-select{border-radius:13px;padding:.76rem .95rem;border-color:#ded8f3;background:#fffdfa}.form-control:focus,.form-select:focus{border-color:#ff6b6b;box-shadow:0 0 0 .22rem rgba(255,107,107,.14)}
+    #map{height:350px;border-radius:18px;overflow:hidden;border:2px solid #e7e0ff;box-shadow:0 14px 30px rgba(51,35,114,.08)}
+    .submit-event{border:0;border-radius:13px;padding:.84rem 1.35rem;font-weight:800;background:linear-gradient(135deg,#6d5dfc,#8b5cf6 45%,#ff6b6b);color:#fff;box-shadow:0 12px 26px rgba(109,93,252,.24);transition:transform .2s,box-shadow .2s}
+    .submit-event:hover{transform:translateY(-1px);box-shadow:0 16px 32px rgba(255,107,107,.25)}
+    .btn-light{border:1px solid #eee7ff;background:#fff;color:#59657b}
+</style>
+<main class="edit-shell">
+    <section class="edit-hero">
+        <div class="eyebrow">Düzenle</div>
+        <h1>Etkinliği güncelle</h1>
+        <p>Değişiklikleri kaydettiğinde etkinlik yeniden yönetici onayına gönderilir.</p>
+    </section>
+    @if (TempData["ErrorMessage"] is string error)
+    {
+        <div class="alert alert-danger" role="alert">@error</div>
+    }
+    <form asp-action="UpdateEvent" method="post" enctype="multipart/form-data" class="edit-card">
+        <input type="hidden" name="id" value="@Model.Id">
+        <input type="hidden" name="RowVersion" value="@Convert.ToBase64String(Model.RowVersion ?? Array.Empty<byte>())">
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="stylesheet" href="~/css/style4.css">
+        <div class="section-label">Temel bilgiler</div>
+        <div class="row g-3">
+            <div class="col-md-8"><label for="Name" class="form-label fw-semibold">Etkinlik adı</label><input class="form-control" id="Name" name="Name" value="@Model.Name" maxlength="100" required></div>
+            <div class="col-md-4"><label for="Category" class="form-label fw-semibold">Kategori</label><select class="form-select" id="Category" name="selectedCategoryId" required>@foreach (var category in categories) { <option value="@category.Id" selected="@(selectedCategory == category.Id ? "selected" : null)">@category.Name</option> }</select></div>
+            <div class="col-12"><label for="Description" class="form-label fw-semibold">Açıklama</label><textarea class="form-control" id="Description" name="Description" rows="4" maxlength="500">@Model.Description</textarea></div>
+            <div class="col-12"><label for="DetailedProgram" class="form-label fw-semibold">Detaylı program</label><textarea class="form-control" id="DetailedProgram" name="DetailedProgram" rows="5" maxlength="3000">@Model.DetailedProgram</textarea><div class="form-text">Bu alan katılımcıların topluluk sayfasında görünür.</div></div>
+            <div class="col-md-8"><label for="Image" class="form-label fw-semibold">Yeni kapak görseli</label><input type="file" class="form-control" id="Image" name="Image" accept="image/jpeg,image/png,image/webp"></div>
+            <div class="col-md-4"><label for="MaxParticipants" class="form-label fw-semibold">Katılım kontenjanı</label><input type="number" class="form-control" id="MaxParticipants" name="MaxParticipants" value="@Model.MaxParticipants" min="1" max="100000" placeholder="Sınırsız"><div class="form-text">Boş bırakırsan sınırsız olur.</div></div>
+        </div>
 
-</head>
+        <hr class="my-4">
+        <div class="section-label">Tarih ve süre</div>
+        <div class="row g-3">
+            <div class="col-md-6"><label for="Date" class="form-label fw-semibold">Başlangıç</label><input type="datetime-local" class="form-control" id="Date" name="Date" value="@Model.Date.ToString("yyyy-MM-ddTHH:mm")" required></div>
+            <div class="col-md-3"><label for="DurationHours" class="form-label fw-semibold">Süre (saat)</label><input type="number" class="form-control" id="DurationHours" name="DurationHours" value="@Model.Duration.Hours" min="0" max="23" required></div>
+            <div class="col-md-3"><label for="DurationMinutes" class="form-label fw-semibold">Süre (dakika)</label><input type="number" class="form-control" id="DurationMinutes" name="DurationMinutes" value="@Model.Duration.Minutes" min="0" max="59" required></div>
+        </div>
 
-<div class="container mt-5">
+        <hr class="my-4">
+        <div class="section-label">Konum</div>
+        <div class="mb-3"><label for="Location" class="form-label fw-semibold">Adres</label><input class="form-control" id="Location" name="Location" value="@Model.Location" maxlength="250" required><div class="form-text">Haritaya tıklayarak konumu hassaslaştırabilirsin.</div></div>
+        <input type="hidden" id="Latitude" name="Latitude" value="@Model.Latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+        <input type="hidden" id="Longitude" name="Longitude" value="@Model.Longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+        <div id="map" aria-label="Etkinlik konumu haritası"></div>
+
+        <div class="d-flex justify-content-end align-items-center gap-3 mt-4">
+            <a class="btn btn-light" asp-controller="User" asp-action="MyEvent">Vazgeç</a>
+            <button class="submit-event" type="submit">Güncelle ve onaya gönder</button>
+        </div>
+    </form>
+</main>
+@section Scripts {
+    <script src="~/vendor/leaflet/leaflet.js"></script>
     <script>
-        $(document).ready(function () {
-            @if (TempData["SuccessMessage"] != null)
-            {
-                <text>
-                    toastr.success('@TempData["SuccessMessage"]', 'Başarılı');
-                </text>
-            }
-            @if (TempData["ErrorMessage"] != null)
-            {
-                <text>
-                    toastr.error('@TempData["ErrorMessage"]', 'Hata');
-                </text>
-            }
+        const initial = [@Model.Latitude.ToString(System.Globalization.CultureInfo.InvariantCulture), @Model.Longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)];
+        const hasInitial = initial[0] !== 0 || initial[1] !== 0;
+        const map = L.map('map').setView(hasInitial ? initial : [39, 35], hasInitial ? 13 : 6);
+        L.tileLayer('/map-tiles/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+        setTimeout(() => map.invalidateSize(), 150);
+        let marker = hasInitial ? L.marker(initial).addTo(map) : null;
+        map.on('click', async event => {
+            marker ??= L.marker(event.latlng).addTo(map);
+            marker.setLatLng(event.latlng);
+            document.getElementById('Latitude').value = event.latlng.lat;
+            document.getElementById('Longitude').value = event.latlng.lng;
+            try {
+                const response = await fetch(`/api/locations/reverse?lat=${event.latlng.lat}&lon=${event.latlng.lng}`);
+                if (response.ok) document.getElementById('Location').value = (await response.json()).displayName;
+            } catch { }
         });
     </script>
-
-    <h1 class="mb-4">Etkinlik Güncelle</h1>
-
-    <form asp-action="UpdateEvent" method="post" enctype="multipart/form-data">
-        <input type="hidden" name="id" value="@Model.Id" />
-
-        <div class="mb-3">
-            <label for="Name" class="form-label">Etkinlik Adı</label>
-            <input type="text" class="form-control" id="Name" name="Name" value="@Model.Name" required>
-        </div>
-
-        <div class="mb-3">
-            <label for="Description" class="form-label">Açıklama</label>
-            <textarea class="form-control" id="Description" name="Description">@Model.Description</textarea>
-        </div>
-
-        <div class="mb-3">
-            <label for="Image" class="form-label">Resim Güncelle</label>
-            <input type="file" class="form-control" id="Image" name="Image" accept="image/*">
-            <img src="@Model.ImageUrl" alt="Mevcut Resim" class="img-thumbnail mt-2" style="max-width: 200px;">
-        </div>
-
-        <div class="mb-3">
-            <label for="Category" class="form-label">Kategori</label>
-            <select class="form-select" id="Category" name="selectedCategoryId" required>
-                <option value="" disabled selected>Kategori seçin</option>
-                @foreach (var category in ViewBag.Categories as List<WebApplication1.Models.Kategori>)
-                {
-                    <option value="@category.Id">@category.Name</option>
-                }
-            </select>
-        </div>
-
-        <div class="mb-3">
-            <label for="Date" class="form-label">Tarih</label>
-            <input type="datetime-local" class="form-control" id="Date" name="Date" value="@Model.Date.ToString("yyyy-MM-ddTHH:mm")" required>
-        </div>
-
-        <div class="mb-3">
-            <label for="DurationHours" class="form-label">Süre (Saat)</label>
-            <input type="number" class="form-control" id="DurationHours" name="DurationHours" value="@Model.Duration.Hours" min="0" required>
-        </div>
-
-        <div class="mb-3">
-            <label for="DurationMinutes" class="form-label">Süre (Dakika)</label>
-            <input type="number" class="form-control" id="DurationMinutes" name="DurationMinutes" value="@Model.Duration.Minutes" min="0" max="59" required>
-        </div>
-
-        <div class="mb-3">
-            <label for="map" class="form-label">Konum Seç</label>
-            <div id="map" style="height: 400px; width: 100%;"></div>
-            <input type="hidden" id="Location" name="Location" value="@Model.Location" required>
-            <input type="text" id="Address" name="Address" class="form-control mt-2" placeholder="Seçilen adres burada görünecek" readonly>
-        </div>
-
-        <button type="submit" class="btn btn-primary">Güncelle</button>
-    </form>
-</div>
-
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRXYjVWKwDEIRF1bA9JeCLsI78Nc9ycrk&callback=initMap" async defer></script>
-
-<script>
-    let map, marker, geocoder;
-
-    function initMap() {
-        geocoder = new google.maps.Geocoder();
-
-        map = new google.maps.Map(document.getElementById("map"), {
-            center: { lat: 39.92077, lng: 32.85411 }, // Ankara, Türkiye koordinatları
-            zoom: 6,
-        });
-
-        map.addListener("click", (event) => {
-            const latLng = event.latLng;
-
-            // Marker oluştur veya taşı
-            if (!marker) {
-                marker = new google.maps.Marker({
-                    position: latLng,
-                    map: map,
-                });
-            } else {
-                marker.setPosition(latLng);
-            }
-
-            // Latitude ve Longitude'u gizli inputa yaz
-            document.getElementById("Location").value = `${latLng.lat()},${latLng.lng()}`;
-
-            // Geocoding servisiyle adresi al
-            geocoder.geocode({ location: latLng }, (results, status) => {
-                if (status === "OK" && results[0]) {
-                    document.getElementById("Address").value = results[0].formatted_address;
-                } else {
-                    document.getElementById("Address").value = "Adres alınamadı.";
-                }
-            });
-        });
-    }
-</script>
+}

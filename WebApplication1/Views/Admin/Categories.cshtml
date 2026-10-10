@@ -1,0 +1,36 @@
+@model IReadOnlyCollection<WebApplication1.Models.Kategori>
+@{
+    ViewData["Title"] = "Kategori Yönetimi";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+<h1>Kategori yönetimi</h1>
+@if (TempData["ErrorMessage"] is string error)
+{
+    <div class="alert alert-danger">@error</div>
+}
+<form asp-action="CreateCategory" method="post" class="d-flex gap-2 mb-4">
+    <label class="visually-hidden" for="categoryName">Kategori adı</label>
+    <input id="categoryName" name="name" class="form-control" maxlength="50" required>
+    <button class="btn btn-primary" type="submit">Ekle</button>
+</form>
+<table class="table">
+    <thead><tr><th>Ad</th><th>Durum</th><th></th></tr></thead>
+    <tbody>
+    @foreach (var category in Model)
+    {
+        <tr>
+            <td>@category.Name</td>
+            <td>@(category.IsArchived ? "Arşivlendi" : "Aktif")</td>
+            <td>
+                @if (!category.IsArchived)
+                {
+                    <form asp-action="ArchiveCategory" method="post">
+                        <input type="hidden" name="id" value="@category.Id">
+                        <button class="btn btn-outline-danger btn-sm" type="submit">Arşivle</button>
+                    </form>
+                }
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>

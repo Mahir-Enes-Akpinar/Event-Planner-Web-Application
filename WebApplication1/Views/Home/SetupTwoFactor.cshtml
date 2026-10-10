@@ -1,0 +1,18 @@
+@{
+    ViewData["Title"] = "İki adımlı doğrulamayı kur";
+}
+<div class="container py-5" style="max-width:640px">
+    <h1>Admin güvenlik kurulumu</h1>
+    <p>Authenticator uygulamanızda yeni bir hesap ekleyin ve aşağıdaki anahtarı girin.</p>
+    <p><code>@ViewData["SharedKey"]</code></p>
+    @if (ViewBag.Error is string error) { <div class="alert alert-danger">@error</div> }
+    <form asp-action="SetupTwoFactor" method="post">
+        <label for="code" class="form-label">Uygulamadaki altı haneli kod</label>
+        <input id="code" name="code" class="form-control" inputmode="numeric" autocomplete="one-time-code" required>
+        <button class="btn btn-primary mt-3" type="submit">Etkinleştir</button>
+    </form>
+    <form asp-action="Logout" method="post" class="mt-3">
+        @Html.AntiForgeryToken()
+        <button class="btn btn-outline-secondary" type="submit">Çıkış yap ve normal kullanıcıya geç</button>
+    </form>
+</div>

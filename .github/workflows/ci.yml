@@ -1,0 +1,20 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+      - run: dotnet restore WebApplication1/WebApplication1.sln
+      - run: dotnet build WebApplication1/WebApplication1.sln -c Release --no-restore --warnaserror
+      - run: dotnet test WebApplication1/WebApplication1.sln -c Release --no-build
+      - run: dotnet list WebApplication1/WebApplication1.csproj package --vulnerable --include-transitive

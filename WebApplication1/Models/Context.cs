@@ -1,87 +1,113 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
-namespace WebApplication1.Models
+namespace WebApplication1.Models;
+
+public class Context : IdentityDbContext<Kullanici, IdentityRole<int>, int>
 {
-    public class Context : DbContext
+    public Context(DbContextOptions<Context> options) : base(options) { }
+
+    public DbSet<Etkinlik> Etkinlikler => Set<Etkinlik>();
+    public DbSet<Kategori> Kategoriler => Set<Kategori>();
+    public DbSet<UserInterest> KullaniciKategorileri => Set<UserInterest>();
+    public DbSet<EventCategory> EtkinlikKategorileri => Set<EventCategory>();
+    public DbSet<Participant> Katilimlar => Set<Participant>();
+    public DbSet<Mesaj> Mesajlar => Set<Mesaj>();
+    public DbSet<Score> Puanlar => Set<Score>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<EmailOutboxMessage> EmailOutbox => Set<EmailOutboxMessage>();
+    public DbSet<EventStaff> EventStaff => Set<EventStaff>();
+    public DbSet<AttendanceQrToken> AttendanceQrTokens => Set<AttendanceQrToken>();
+    public DbSet<Kullanici> Kullanicilar => Users;
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        private readonly IConfiguration _configuration;
+        base.OnModelCreating(modelBuilder);
 
-        public Context(DbContextOptions<Context> options, IConfiguration configuration)
-            : base(options)
+        modelBuilder.Entity<Kullanici>(entity =>
         {
-            _configuration = configuration;
-        }
+            entity.ToTable("Kullanicilar");
+            entity.HasQueryFilter(user => !user.IsDeleted);
+        });
 
-        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        modelBuilder.Entity<Etkinlik>(entity =>
         {
-            if (!optionsBuilder.IsConfigured)
-            {
-                string connectionString = _configuration.GetConnectionString("DefaultConnection");
-                optionsBuilder.UseSqlServer(connectionString);
-            }
-        }
+            entity.HasQueryFilter(item => !item.IsDeleted && !item.CreatedByUser.IsDeleted);
+            entity.HasOne(item => item.CreatedByUser).WithMany()
+                .HasForeignKey(item => item.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
 
-        // DbSet Properties (Tablolar)
-        public DbSet<Kullanici> Kullanicilar { get; set; } // Kullanıcılar
-        public DbSet<Etkinlik> Etkinlikler { get; set; } // Etkinlikler
-        public DbSet<Kategori> Kategoriler { get; set; } // Kategoriler
-        public DbSet<UserInterest> KullaniciKategorileri { get; set; } // Kullanıcı-Kategori Many-to-Many
-        public DbSet<EventCategory> EtkinlikKategorileri { get; set; } // Etkinlik-Kategori Many-to-Many
-        public DbSet<Participant> Katilimlar { get; set; } // Katılımlar
-        public DbSet<Mesaj> Mesajlar { get; set; } // Mesajlar
-        public DbSet<Score> Puanlar { get; set; } // Puanlar
+        modelBuilder.Entity<Kategori>().HasIndex(category => category.Name).IsUnique();
 
-        
-
-        // OnModelCreating: Veritabanı ilişkilerinin yapılandırılması
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        modelBuilder.Entity<UserInterest>(entity =>
         {
-            modelBuilder.Entity<Etkinlik>()
-                .HasOne(e => e.CreatedByUser) // İlişkili kullanıcı
-                .WithMany() // Kullanıcı birden fazla etkinlik oluşturabilir
-                .HasForeignKey(e => e.CreatedByUserId) // Yabancı anahtar
-        .OnDelete(DeleteBehavior.Restrict); // Kullanıcı silinirse etkinlikler etkilenmez
+            entity.HasKey(item => new { item.KullaniciId, item.KategoriId });
+            entity.HasOne(item => item.Kullanici).WithMany(user => user.UserInterests)
+                .HasForeignKey(item => item.KullaniciId);
+            entity.HasOne(item => item.Kategori).WithMany(category => category.UserInterests)
+                .HasForeignKey(item => item.KategoriId);
+        });
 
+        modelBuilder.Entity<EventCategory>(entity =>
+        {
+            entity.HasQueryFilter(item => !item.Etkinlik.IsDeleted);
+            entity.HasKey(item => new { item.EtkinlikId, item.KategoriId });
+            entity.HasOne(item => item.Etkinlik).WithMany(eventItem => eventItem.EventCategories)
+                .HasForeignKey(item => item.EtkinlikId);
+            entity.HasOne(item => item.Kategori).WithMany(category => category.EventCategories)
+                .HasForeignKey(item => item.KategoriId);
+        });
 
-            // Kullanıcı-Kategori Many-to-Many İlişkisi
-            modelBuilder.Entity<UserInterest>()
-                .HasKey(uc => new { uc.KullaniciId, uc.KategoriId }); // Composite Primary Key
+        modelBuilder.Entity<Participant>(entity =>
+        {
+            entity.HasQueryFilter(item => !item.Etkinlik.IsDeleted && !item.Kullanici.IsDeleted);
+            entity.HasIndex(item => new { item.KullaniciId, item.EtkinlikId }).IsUnique();
+            entity.HasOne(item => item.Kullanici).WithMany()
+                .HasForeignKey(item => item.KullaniciId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.Etkinlik).WithMany(eventItem => eventItem.Participants)
+                .HasForeignKey(item => item.EtkinlikId);
+        });
 
-            modelBuilder.Entity<UserInterest>()
-                .HasOne(uc => uc.Kullanici)
-                .WithMany(u => u.UserInterests)
-                .HasForeignKey(uc => uc.KullaniciId);
+        modelBuilder.Entity<EventStaff>(entity =>
+        {
+            entity.HasQueryFilter(item => !item.Etkinlik.IsDeleted && !item.User.IsDeleted);
+            entity.HasIndex(item => new { item.EtkinlikId, item.UserId, item.Role }).IsUnique();
+            entity.HasOne(item => item.Etkinlik).WithMany(eventItem => eventItem.StaffMembers)
+                .HasForeignKey(item => item.EtkinlikId);
+            entity.HasOne(item => item.User).WithMany(user => user.EventStaffAssignments)
+                .HasForeignKey(item => item.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
 
-            modelBuilder.Entity<UserInterest>()
-                .HasOne(uc => uc.Kategori)
-                .WithMany(c => c.UserInterests)
-                .HasForeignKey(uc => uc.KategoriId);
+        modelBuilder.Entity<AttendanceQrToken>(entity =>
+        {
+            entity.HasQueryFilter(item => !item.Etkinlik.IsDeleted && !item.Participant.Kullanici.IsDeleted);
+            entity.HasIndex(item => item.TokenHash).IsUnique();
+            entity.HasOne(item => item.Etkinlik).WithMany(eventItem => eventItem.AttendanceQrTokens)
+                .HasForeignKey(item => item.EtkinlikId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.Participant).WithMany(participant => participant.AttendanceQrTokens)
+                .HasForeignKey(item => item.ParticipantId).OnDelete(DeleteBehavior.Cascade);
+        });
 
-            // Etkinlik-Kategori Many-to-Many İlişkisi
-            modelBuilder.Entity<EventCategory>()
-                .HasKey(ec => new { ec.EtkinlikId, ec.KategoriId }); // Composite Primary Key
+        modelBuilder.Entity<Mesaj>(entity =>
+        {
+            entity.HasQueryFilter(message => !message.Etkinlik.IsDeleted && !message.Sender.IsDeleted);
+            entity.HasOne(message => message.Sender).WithMany(user => user.SentMessages)
+                .HasForeignKey(message => message.SenderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(message => message.Etkinlik).WithMany(eventItem => eventItem.Messages)
+                .HasForeignKey(message => message.EtkinlikId);
+        });
 
-            modelBuilder.Entity<EventCategory>()
-                .HasOne(ec => ec.Etkinlik)
-                .WithMany(e => e.EventCategories)
-                .HasForeignKey(ec => ec.EtkinlikId);
-
-            modelBuilder.Entity<EventCategory>()
-                .HasOne(ec => ec.Kategori)
-                .WithMany(c => c.EventCategories)
-                .HasForeignKey(ec => ec.KategoriId);
-
-            // Diğer ilişkiler (opsiyonel, örn: mesajlar ve katılımlar)
-            // Kullanıcı - Mesaj İlişkisi
-            modelBuilder.Entity<Mesaj>()
-                .HasOne(m => m.Sender)
-                .WithMany(u => u.SentMessages)
-                .HasForeignKey(m => m.SenderId);
-
-            modelBuilder.Entity<Mesaj>()
-                .HasOne(m => m.Etkinlik)
-                .WithMany(e => e.Messages)
-                .HasForeignKey(m => m.EtkinlikId);
-        }
+        modelBuilder.Entity<Score>(entity =>
+        {
+            entity.HasQueryFilter(item => !item.Kullanici.IsDeleted);
+            entity.HasIndex(item => new { item.KullaniciId, item.Reason, item.SourceId }).IsUnique();
+            entity.HasIndex(item => new { item.KullaniciId, item.Reason })
+                .IsUnique()
+                .HasFilter("[Reason] = 2 AND [RevokedAtUtc] IS NULL");
+            entity.HasOne(item => item.Kullanici).WithMany(user => user.Scores)
+                .HasForeignKey(item => item.KullaniciId).OnDelete(DeleteBehavior.Restrict);
+        });
     }
 }

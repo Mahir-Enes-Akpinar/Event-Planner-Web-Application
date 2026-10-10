@@ -1,331 +1,295 @@
+using System.Diagnostics;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using WebApplication1.Models;
-using System;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using System.Net.Mail;
-using System.Net;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication;
-using System.Security.Claims;
-using static System.Net.Mime.MediaTypeNames;
+using WebApplication1.Services;
 
-namespace WebApplication1.Controllers
+namespace WebApplication1.Controllers;
+
+public class HomeController : Controller
 {
-    public class HomeController : Controller
+    private readonly UserManager<Kullanici> _userManager;
+    private readonly SignInManager<Kullanici> _signInManager;
+    private readonly IEmailService _emailService;
+    private readonly ILogger<HomeController> _logger;
+    private readonly IWebHostEnvironment _environment;
+
+    public HomeController(
+        UserManager<Kullanici> userManager,
+        SignInManager<Kullanici> signInManager,
+        IEmailService emailService,
+        ILogger<HomeController> logger,
+        IWebHostEnvironment environment)
     {
-        private readonly Context _context;
+        _userManager = userManager;
+        _signInManager = signInManager;
+        _emailService = emailService;
+        _logger = logger;
+        _environment = environment;
+    }
 
-        public HomeController(Context context)
+    [AllowAnonymous]
+    public async Task<IActionResult> Index()
+    {
+        if (User.Identity?.IsAuthenticated != true)
+            return View();
+
+        if (User.IsInRole("Admin"))
         {
-            _context = context;
+            var user = await _userManager.GetUserAsync(User);
+            return user is not null && !user.TwoFactorEnabled
+                ? RedirectToAction(nameof(SetupTwoFactor))
+                : RedirectToAction("Index", "Admin");
+        }
+        return RedirectToAction("Index", "User");
+    }
+
+    [AllowAnonymous, HttpPost, EnableRateLimiting("authentication")]
+    public async Task<IActionResult> Login(string userName, string password)
+    {
+        var result = await _signInManager.PasswordSignInAsync(
+            userName, password, isPersistent: false, lockoutOnFailure: true);
+
+        if (result.RequiresTwoFactor)
+            return RedirectToAction(nameof(TwoFactorLogin));
+
+        if (!result.Succeeded)
+        {
+            TempData["ErrorMessage"] = result.IsLockedOut
+                ? "Ã‡ok fazla baÅŸarÄ±sÄ±z deneme yapÄ±ldÄ±. LÃ¼tfen daha sonra tekrar deneyin."
+                : result.IsNotAllowed
+                    ? "E-posta adresiniz henÃ¼z doÄŸrulanmamÄ±ÅŸ. KayÄ±t sÄ±rasÄ±nda gÃ¶nderilen doÄŸrulama baÄŸlantÄ±sÄ±nÄ± aÃ§Ä±n."
+                    : "KullanÄ±cÄ± adÄ± veya ÅŸifre yanlÄ±ÅŸ.";
+            return RedirectToAction(nameof(Index));
         }
 
-        // Giriþ Sayfasý
-        public IActionResult Index()
+        var user = await _userManager.FindByNameAsync(userName);
+        if (user is null || user.IsDeleted)
         {
-            // Kullanýcý giriþ yapmamýþsa
-
-            if (HttpContext.Session.GetString("UserId") == null)
-            {
-                return View(); // Giriþ ve kayýt formlarýný göster
-            }
-
-            // Kullanýcý giriþ yapmýþsa
-            return RedirectToAction("Login"); // Kullanýcý paneline yönlendir
+            await _signInManager.SignOutAsync();
+            TempData["ErrorMessage"] = "Hesap kullanÄ±lamÄ±yor.";
+            return RedirectToAction(nameof(Index));
         }
 
- //*---------------------------------- Giriþ Ýþlemi ------------------------------------------------------------------------------------------------*//
-        [HttpPost]
-        public IActionResult Login(string UserName, string Password)
+        SetCompatibilitySession(user);
+        if (await _userManager.IsInRoleAsync(user, "Admin"))
         {
-            
-
-            var user = _context.Kullanicilar.FirstOrDefault(u => u.UserName == UserName && u.Password == HashPassword(Password));
-            if (user != null)
-            {
-
-                // Kullanýcýnýn rolüne göre yönlendirme
-                if (user.Role == RoleType.Admin)
-                {
-                    HttpContext.Session.SetString("UserId", user.Id.ToString());
-                    HttpContext.Session.SetString("UserName", user.UserName);
-                    HttpContext.Session.SetString("UserRole", "Admin");
-                    return RedirectToAction("Index", "Admin");
-                }
-
-
-                // Claims ekleyin
-                var claims = new List<Claim>
-                {
-                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                    new Claim(ClaimTypes.Name, user.UserName),
-                    new Claim("Location", user.Location ?? "")
-                };
-
-                var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-                var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
-
-                // Kullanýcýyý oturum açtýrýn
-
-
-
-                HttpContext.Session.SetString("UserId", user.Id.ToString());
-                HttpContext.Session.SetString("UserName", user.UserName);
-                HttpContext.Session.SetString("UserProfilePicture", user.ProfilePicture ?? "~/images/profile.png");
-                ViewData["UserName"] = HttpContext.Session.GetString("UserName") ?? "Misafir Kullanýcý";
-                ViewData["UserProfilePicture"] = HttpContext.Session.GetString("UserProfilePicture") ?? "~/images/profile.png";
-
-
-
-
-                var hasInterests = _context.KullaniciKategorileri.Any(kc => kc.KullaniciId == user.Id);
-                if (!hasInterests)
-                {
-                    return RedirectToAction("SelectInterests", "User");
-                }
-
-                return RedirectToAction("Index", "User");
-            }
-
-            TempData["ErrorMessage"] = "Kullanýcý adý veya þifre yanlýþ.";
-            return RedirectToAction("Index");
+            if (!await _userManager.GetTwoFactorEnabledAsync(user))
+                return RedirectToAction(nameof(SetupTwoFactor));
+            return RedirectToAction("Index", "Admin");
         }
 
+        return RedirectToAction("Index", "User");
+    }
 
- //*------------------------------------------------------ Kayýt Olma Ýþlemi ------------------------------------------------------------------------------------------------*//
-        [HttpPost]
-        public IActionResult Register(string UserName, string Email, string Password, string FirstName, string LastName, DateTime BirthDate, string Location, string Gender, string PhoneNumber, IFormFile Image)
+    [AllowAnonymous, HttpPost, EnableRateLimiting("authentication")]
+    public async Task<IActionResult> Register(string userName, string email, string password)
+    {
+        if (string.IsNullOrWhiteSpace(userName) || userName.Trim().Length > 50 ||
+            string.IsNullOrWhiteSpace(email) || email.Trim().Length > 256 ||
+            string.IsNullOrWhiteSpace(password) || password.Length > 128)
         {
-            // Kullanýcý adý veya e-posta kontrolü
-            var existingUser = _context.Kullanicilar.FirstOrDefault(u => u.UserName == UserName || u.Email == Email);
-            if (existingUser != null)
-            {
-                TempData["ErrorMessage"] = "Kullanýcý Adý veya E-posta zaten mevcut.";
-                return RedirectToAction("Index"); // Giriþ sayfasýna yönlendir
-            }
-
-            string imageUrl = "/images/default-profile.png";
-            if (Image != null && Image.Length > 0)
-            {
-                try
-                {
-                    var fileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(Image.FileName);
-                    var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images", fileName);
-
-                    using (var stream = new FileStream(filePath, FileMode.Create))
-                    {
-                        Image.CopyTo(stream);
-                    }
-
-                    imageUrl = "/images/" + fileName; // Resim URL'si
-                }
-                catch (Exception ex)
-                {
-                    TempData["ErrorMessage"] = $"Resim yüklenirken hata oluþtu: {ex.Message}";
-                }
-            }
-
-            // Yeni Kullanýcý oluþtur
-            var newUser = new Kullanici
-            {
-                UserName = UserName,
-                Email = Email,
-                Password = HashPassword(Password), // Þifreyi hashle
-                FirstName = FirstName,
-                LastName = LastName,
-                BirthDate = BirthDate,
-                Location = Location,
-                Gender = Gender,
-                PhoneNumber = PhoneNumber,
-                ProfilePicture = imageUrl // Profil resmi varsa kaydet
-            };
-
-            // Veritabanýna ekle
-            _context.Kullanicilar.Add(newUser);
-            _context.SaveChanges();
-
-            // Kayýt baþarý mesajý
-            TempData["SuccessMessage"] = "Kayýt baþarýyla tamamlandý. Giriþ yapabilirsiniz.";
-            return RedirectToAction("Index"); // Giriþ sayfasýna yönlendir
+            TempData["ErrorMessage"] = "KayÄ±t bilgileri eksik veya geÃ§ersiz.";
+            return RedirectToAction(nameof(Index));
         }
 
-        // Kullanýcý Paneli
-        public IActionResult Dashboard()
+        var user = new Kullanici
         {
-            if (HttpContext.Session.GetString("UserId") == null)
-            {
-                return RedirectToAction("Index"); // Oturum yoksa giriþ sayfasýna yönlendir
-            }
+            UserName = userName.Trim(),
+            Email = email.Trim(),
+            EmailConfirmed = _environment.IsDevelopment(),
+            FirstName = "Belirtilmedi",
+            LastName = "Belirtilmedi",
+            BirthDate = new DateTime(1900, 1, 1),
+            Gender = "Belirtilmedi",
+            ProfilePicture = "/images/default-profile.png"
+        };
 
-            return View(); // Kullanýcý panelini döndür
+        var result = await _userManager.CreateAsync(user, password);
+        if (!result.Succeeded)
+        {
+            TempData["ErrorMessage"] = string.Join(" ", result.Errors.Select(error => error.Description));
+            return RedirectToAction(nameof(Index));
         }
 
-        // Admin Paneli
-        public IActionResult AdminDashboard()
+        await _userManager.AddToRoleAsync(user, "User");
+        var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+        var confirmationUrl = Url.Action(nameof(ConfirmEmail), "Home",
+            new { userId = user.Id, token }, Request.Scheme)!;
+
+        await _emailService.SendAsync(user.Email!, "E-posta adresinizi doÄŸrulayÄ±n",
+            $"HesabÄ±nÄ±zÄ± doÄŸrulamak iÃ§in baÄŸlantÄ±yÄ± aÃ§Ä±n: {confirmationUrl}");
+
+        var registrationMessage = "KayÄ±t tamamlandÄ±. E-posta doÄŸrulama baÄŸlantÄ±sÄ± gÃ¶nderildi.";
+        if (_environment.IsDevelopment())
+            registrationMessage += $" Yerel geliÅŸtirme baÄŸlantÄ±sÄ±: {confirmationUrl}";
+        TempData["SuccessMessage"] = registrationMessage;
+        return RedirectToAction(nameof(Index));
+    }
+
+    [AllowAnonymous, HttpGet]
+    public async Task<IActionResult> ConfirmEmail(int userId, string token)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null) return NotFound();
+
+        var result = await _userManager.ConfirmEmailAsync(user, token);
+        TempData[result.Succeeded ? "SuccessMessage" : "ErrorMessage"] = result.Succeeded
+            ? "E-posta adresiniz doÄŸrulandÄ±."
+            : "DoÄŸrulama baÄŸlantÄ±sÄ± geÃ§ersiz veya sÃ¼resi dolmuÅŸ.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [Authorize, HttpPost]
+    public async Task<IActionResult> Logout()
+    {
+        await _signInManager.SignOutAsync();
+        HttpContext.Session.Clear();
+        return RedirectToAction(nameof(Index));
+    }
+
+    [AllowAnonymous, HttpGet]
+    public IActionResult TwoFactorLogin() => View();
+
+    [AllowAnonymous, HttpPost, EnableRateLimiting("authentication")]
+    public async Task<IActionResult> TwoFactorLogin(string code)
+    {
+        var user = await _signInManager.GetTwoFactorAuthenticationUserAsync();
+        if (user is null) return RedirectToAction(nameof(Index));
+        var result = await _signInManager.TwoFactorAuthenticatorSignInAsync(
+            code.Replace(" ", string.Empty).Replace("-", string.Empty), false, false);
+        if (!result.Succeeded)
         {
-            if (HttpContext.Session.GetString("UserId") != "admin")
-            {
-                return RedirectToAction("Index"); // Admin deðilse giriþ sayfasýna yönlendir
-            }
-
-            return View(); // Admin panelini döndür
-        }
-
-        // Çýkýþ Ýþlemi
-        public IActionResult Logout()
-        {
-            HttpContext.Session.Clear(); // Oturumu temizle
-            TempData["SuccessMessage"] = "Oturum Kapatýldý";
-            return RedirectToAction("Index"); // Giriþ sayfasýna yönlendir
-        }
-
-
-
-//*---------------------------------- Þifre Unuttum Ýþlemi ------------------------------------------------------------------------------------------------*//
-
-        [HttpGet]
-        public IActionResult ForgotPassword()
-        {
+            ViewBag.Error = "DoÄŸrulama kodu geÃ§ersiz.";
             return View();
         }
 
-        [HttpPost]
-        public IActionResult ForgotPassword(string email)
+        SetCompatibilitySession(user);
+        return RedirectToAction("Index", "Admin");
+    }
+
+    [Authorize(Roles = "Admin"), HttpGet]
+    public async Task<IActionResult> SetupTwoFactor()
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user is null) return Challenge();
+        var key = await _userManager.GetAuthenticatorKeyAsync(user);
+        if (string.IsNullOrWhiteSpace(key))
         {
-            // Kullanýcýyý kontrol et
-            var user = _context.Kullanicilar.FirstOrDefault(u => u.Email == email);
-            if (user == null)
-            {
-                ViewBag.Error = "Bu e-posta adresi sistemde bulunamadý.";
-                return View();
-            }
+            await _userManager.ResetAuthenticatorKeyAsync(user);
+            key = await _userManager.GetAuthenticatorKeyAsync(user);
+        }
+        ViewData["SharedKey"] = key;
+        return View();
+    }
 
-            // Doðrulama kodu oluþtur
-            string verificationCode = GenerateVerificationCode();
+    [Authorize(Roles = "Admin"), HttpPost]
+    public async Task<IActionResult> SetupTwoFactor(string code)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user is null) return Challenge();
+        var valid = await _userManager.VerifyTwoFactorTokenAsync(user,
+            _userManager.Options.Tokens.AuthenticatorTokenProvider,
+            code.Replace(" ", string.Empty).Replace("-", string.Empty));
+        if (!valid)
+        {
+            ViewBag.Error = "DoÄŸrulama kodu geÃ§ersiz.";
+            ViewData["SharedKey"] = await _userManager.GetAuthenticatorKeyAsync(user);
+            return View();
+        }
+        await _userManager.SetTwoFactorEnabledAsync(user, true);
+        await _signInManager.RefreshSignInAsync(user);
+        return RedirectToAction("Index", "Admin");
+    }
 
-            HttpContext.Session.SetString("Email", email);
-            HttpContext.Session.SetString("VerificationCode", verificationCode);
+    [AllowAnonymous, HttpGet]
+    public IActionResult ForgotPassword() => View();
 
-            // Doðrulama kodunu bir yere kaydet (veritabanýnda veya geçici bir saklama yerinde)
-            TempData["VerificationCode"] = verificationCode;
-            TempData["Email"] = email;
-
-
-
-            // Doðrulama kodunu e-posta gönder
-            SendEmail(user.Email, "Þifre Sýfýrlama Doðrulama Kodu", $"Doðrulama kodunuz: {verificationCode}");
-
-            return RedirectToAction("VerifyCode");
+    [AllowAnonymous, HttpPost, EnableRateLimiting("authentication")]
+    public async Task<IActionResult> ForgotPassword(string email)
+    {
+        var user = await _userManager.FindByEmailAsync(email.Trim());
+        if (user is not null && await _userManager.IsEmailConfirmedAsync(user))
+        {
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var resetUrl = Url.Action(nameof(VerifyCode), "Home",
+                new { email = user.Email, token }, Request.Scheme)!;
+            await _emailService.SendAsync(user.Email!, "Åžifre sÄ±fÄ±rlama",
+                $"Åžifrenizi sÄ±fÄ±rlamak iÃ§in baÄŸlantÄ±yÄ± aÃ§Ä±n: {resetUrl}");
         }
 
-        private string GenerateVerificationCode()
+        TempData["SuccessMessage"] = "Adres kayÄ±tlÄ±ysa ÅŸifre sÄ±fÄ±rlama baÄŸlantÄ±sÄ± gÃ¶nderildi.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [AllowAnonymous, HttpGet]
+    public IActionResult VerifyCode(string email, string token)
+    {
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
+            return RedirectToAction(nameof(ForgotPassword));
+
+        ViewData["Email"] = email;
+        ViewData["Token"] = token;
+        return View();
+    }
+
+    [AllowAnonymous, HttpPost, EnableRateLimiting("authentication")]
+    public async Task<IActionResult> VerifyCode(string email, string verificationCode, string newPassword)
+    {
+        var user = await _userManager.FindByEmailAsync(email.Trim());
+        if (user is null)
         {
-            return new Random().Next(100000, 999999).ToString(); // 6 haneli kod oluþtur
+            TempData["ErrorMessage"] = "SÄ±fÄ±rlama baÄŸlantÄ±sÄ± geÃ§ersiz veya sÃ¼resi dolmuÅŸ.";
+            return RedirectToAction(nameof(ForgotPassword));
         }
 
-        private void SendEmail(string toEmail, string subject, string body)
+        var result = await _userManager.ResetPasswordAsync(user, verificationCode, newPassword);
+        if (!result.Succeeded)
         {
-            try
-            {
-                var emailSettings = new
-                {
-                    SMTPHost = "smtp.gmail.com",
-                    SMTPPort = 587,
-                    SMTPUser = "hamzaefe149@gmail.com",
-                    SMTPPass = "obnd kdko gacv erlh",
-                    FromEmail = "hamzaefe149@gmail.com",
-                    FromName = "EtkinlikPlatform"
-                };
-
-                using (var client = new SmtpClient(emailSettings.SMTPHost, emailSettings.SMTPPort))
-                {
-                    client.Credentials = new NetworkCredential(emailSettings.SMTPUser, emailSettings.SMTPPass);
-                    client.EnableSsl = true;
-
-                    var mailMessage = new MailMessage
-                    {
-                        From = new MailAddress(emailSettings.FromEmail, emailSettings.FromName),
-                        Subject = subject,
-                        Body = body,
-                        IsBodyHtml = true
-                    };
-                    mailMessage.To.Add(toEmail);
-
-                    client.Send(mailMessage);
-                    Console.WriteLine($"E-posta {toEmail} adresine baþarýyla gönderildi.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"E-posta gönderim hatasý: {ex.Message}");
-            }
-        }
-        //doðrulma kodu
-
-        [HttpGet]
-        public IActionResult VerifyCode()
-        {
-            var email = HttpContext.Session.GetString("Email"); // veya TempData["Email"]
-            if (string.IsNullOrEmpty(email))
-            {
-                TempData["Error"] = "Doðrulama süresi doldu. Lütfen tekrar deneyin.";
-                return RedirectToAction("ForgotPassword");
-            }
-
-            ViewData["Email"] = email; // View'e email deðerini gönder
+            ViewData["Email"] = email;
+            ViewData["Token"] = verificationCode;
+            ViewBag.Error = string.Join(" ", result.Errors.Select(error => error.Description));
             return View();
         }
 
-       
-        [HttpPost]
-        public IActionResult VerifyCode(string email, string verificationCode, string newPassword)
-        {
-            // Session deðerlerini kontrol et
-            var storedCode = TempData["VerificationCode"]?.ToString();
-            var storedEmail = TempData["Email"]?.ToString();
+        TempData["SuccessMessage"] = "Åžifreniz gÃ¼ncellendi.";
+        return RedirectToAction(nameof(Index));
+    }
 
-            if (storedCode == null || storedEmail == null)
-            {
-                ViewBag.Error = "Doðrulama süresi doldu. Lütfen tekrar deneyin.";
-                return RedirectToAction("ForgotPassword");
-            }
-            Console.WriteLine(storedCode);
-            Console.WriteLine(storedEmail);
-            if (storedCode != verificationCode || storedEmail != email)
-            {
-                ViewBag.Error = "Doðrulama kodu yanlýþ.";
-                return View(); // VerifyCode sayfasýný tekrar göster
-            }
+    [Authorize]
+    public IActionResult Dashboard() => RedirectToAction("Index", "User");
 
-            // Kullanýcýnýn þifresini güncelle
-            var user = _context.Kullanicilar.FirstOrDefault(u => u.Email == email);
-            if (user != null)
-            {
-                user.Password = HashPassword(newPassword);
-                _context.SaveChanges();
+    [Authorize(Roles = "Admin")]
+    public IActionResult AdminDashboard() => RedirectToAction("Index", "Admin");
 
-                TempData["Message"] = "Þifreniz baþarýyla sýfýrlandý. Yeni þifrenizle giriþ yapabilirsiniz.";
-                return RedirectToAction("Index"); // Giriþ sayfasýna yönlendir
-            }
+    [AllowAnonymous]
+    public IActionResult Privacy() => View();
 
-            ViewBag.Error = "Bir hata oluþtu. Lütfen tekrar deneyin.";
-            return View();
-        }
+    [AllowAnonymous]
+    public IActionResult AccessDenied() => View("AccessDenied");
 
+    [AllowAnonymous]
+    public IActionResult HttpError(int code)
+    {
+        Response.StatusCode = code;
+        ViewData["StatusCode"] = code;
+        return View("HttpError");
+    }
 
+    [AllowAnonymous]
+    public IActionResult Error()
+    {
+        var requestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
+        _logger.LogError("Unhandled request failure. RequestId: {RequestId}", requestId);
+        return View("~/Views/Shared/Error.cshtml", new ErrorViewModel { RequestId = requestId });
+    }
 
-
-
-        // Þifre Hashleme Yardýmcý Fonksiyonu
-        private string HashPassword(string password)
-        {
-            using (var sha256 = SHA256.Create())
-            {
-                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-                return BitConverter.ToString(hashedBytes).Replace("-", "").ToLower();
-            }
-        }
+    private void SetCompatibilitySession(Kullanici user)
+    {
+        HttpContext.Session.SetString("UserId", user.Id.ToString());
+        HttpContext.Session.SetString("UserName", user.UserName ?? string.Empty);
+        HttpContext.Session.SetString("UserProfilePicture", user.ProfilePicture ?? "/images/default-profile.png");
     }
 }

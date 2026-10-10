@@ -3,8 +3,8 @@
 @{
     ViewData["Title"] = "Admin Panel - Dashboard";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var pendingEvents = ViewData["PendingEvents"] as IReadOnlyCollection<Etkinlik> ?? Array.Empty<Etkinlik>();
 }
-<head>
 
     <!-- Hata Measj teaster entegre-->
 
@@ -13,19 +13,18 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 
 
-</head>
 <script>
     $(document).ready(function () {
     @if (TempData["SuccessMessage"] != null)
     {
         <text>
-                    toastr.success('@TempData["SuccessMessage"]', 'Başarılı');
+                        toastr.success(@Json.Serialize(TempData["SuccessMessage"]), 'Başarılı');
         </text>
     }
     @if (TempData["ErrorMessage"] != null)
     {
         <text>
-                    toastr.error('@TempData["ErrorMessage"]', 'Hata');
+                        toastr.error(@Json.Serialize(TempData["ErrorMessage"]), 'Hata');
         </text>
     }
                     });
@@ -35,10 +34,10 @@
     <h1 class="mb-4 text-center">Onay Bekleyen Etkinlikler</h1>
     
 
-    @if (ViewData["PendingEvents"] != null && ((List<WebApplication1.Models.Etkinlik>)ViewData["PendingEvents"]).Any())
+    @if (pendingEvents.Any())
     {
         <div class="row row-cols-1 row-cols-md-3 g-4">
-            @foreach (var ev in (List<WebApplication1.Models.Etkinlik>)ViewData["PendingEvents"])
+            @foreach (var ev in pendingEvents)
             {
                 <div class="col">
                     <div class="card event-card h-100 shadow-sm">
@@ -61,6 +60,7 @@
                             </form>
                             <form method="post" asp-action="RejectEvent" asp-controller="Admin">
                                 <input type="hidden" name="eventId" value="@ev.Id" />
+                                <input type="text" name="rejectionReason" required maxlength="500" placeholder="Ret gerekçesi" class="form-control form-control-sm mb-1" />
                                 <button class="btn btn-danger btn-sm">Reddet</button>
                             </form>
                         </div>

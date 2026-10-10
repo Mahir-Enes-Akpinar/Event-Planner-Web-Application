@@ -4,7 +4,6 @@
     ViewData["Title"] = "Etkinlik Güncelle - Admin";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
 }
-<head>
 
     <!-- Hata Measj teaster entegre-->
 
@@ -13,19 +12,18 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 
 
-</head>
 <script>
     $(document).ready(function () {
     @if (TempData["SuccessMessage"] != null)
     {
         <text>
-                    toastr.success('@TempData["SuccessMessage"]', 'Başarılı');
+                        toastr.success(@Json.Serialize(TempData["SuccessMessage"]), 'Başarılı');
         </text>
     }
     @if (TempData["ErrorMessage"] != null)
     {
         <text>
-                    toastr.error('@TempData["ErrorMessage"]', 'Hata');
+                        toastr.error(@Json.Serialize(TempData["ErrorMessage"]), 'Hata');
         </text>
     }
                     });

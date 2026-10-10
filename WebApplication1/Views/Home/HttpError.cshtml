@@ -1,0 +1,9 @@
+@{
+    var code = (int?)ViewData["StatusCode"] ?? 500;
+    ViewData["Title"] = $"Hata {code}";
+}
+<div class="container py-5">
+    <h1>@code</h1>
+    <p>İstek tamamlanamadı. Lütfen önceki sayfaya dönüp tekrar deneyin.</p>
+    <a asp-controller="Home" asp-action="Index" class="btn btn-primary">Ana sayfa</a>
+</div>

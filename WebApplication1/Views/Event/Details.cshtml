@@ -1,256 +1,158 @@
-﻿@model WebApplication1.Models.Etkinlik
-
+@model WebApplication1.Models.Etkinlik
+@inject IConfiguration Configuration
+@using System.Security.Claims
+@using System.Text.Json
 @{
-      Layout = "~/Views/Shared/UserLayout.cshtml";
+    ViewData["Title"] = Model.Name;
+    Layout = "~/Views/Shared/UserLayout.cshtml";
+    var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    var participation = Model.Participants.FirstOrDefault(item => item.KullaniciId == userId);
+    var isOwner = Model.CreatedByUserId == userId || User.IsInRole("Admin");
+    var registeredCount = Model.Participants.Count(item => item.Status == ParticipationStatus.Registered);
+    var eventEnded = Model.Date.Add(Model.Duration) <= DateTime.Now;
 }
+<link rel="stylesheet" href="~/vendor/leaflet/leaflet.css">
+<style>
+    .details-shell{display:grid;gap:22px}
+    .details-hero{overflow:hidden;display:grid;grid-template-columns:minmax(280px,.9fr) 1.1fr;gap:0;border:1px solid rgba(255,255,255,.78);border-radius:30px;background:rgba(255,255,255,.66);box-shadow:0 26px 70px rgba(51,35,114,.13);backdrop-filter:blur(22px)}
+    .details-cover{width:100%;height:100%;min-height:390px;object-fit:cover}
+    .details-copy{padding:30px;display:flex;flex-direction:column;gap:18px}
+    .details-copy h1{margin:0;font-weight:900;letter-spacing:-.055em;line-height:1}
+    .details-description{color:var(--muted);font-size:1rem;line-height:1.6}
+    .meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .meta-card{padding:14px;border:1px solid rgba(232,229,245,.85);border-radius:18px;background:rgba(255,255,255,.74)}
+    .meta-card span{display:block;color:var(--muted);font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em}.meta-card strong{display:block;margin-top:4px;color:var(--navy)}
+    .status-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.soft-pill{display:inline-flex;align-items:center;min-height:34px;padding:0 12px;border-radius:999px;background:#fff1f2;color:#e11d48;font-weight:850}.owner-pill{background:#eefdfb;color:#0f766e}
+    .action-panel{display:flex;gap:12px;flex-wrap:wrap;margin-top:auto}
+    .details-card{padding:22px;border:1px solid rgba(255,255,255,.78);border-radius:26px;background:rgba(255,255,255,.66);box-shadow:0 22px 54px rgba(51,35,114,.1);backdrop-filter:blur(20px)}
+    #map{height:360px;border:2px solid #e7e0ff;border-radius:20px;box-shadow:0 14px 30px rgba(51,35,114,.08)}
+    .community-head{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:16px}
+    .community-head h2{margin:0;font-weight:900;letter-spacing:-.04em}.community-head p{margin:4px 0 0;color:var(--muted)}
+    .message-list{display:grid;gap:12px;margin-bottom:18px}
+    .community-message{position:relative;padding:16px;border:1px solid rgba(232,229,245,.95);border-radius:20px;background:rgba(255,255,255,.78)}
+    .community-message.pinned{border-color:rgba(255,183,3,.55);background:linear-gradient(135deg,#fff7ed,rgba(255,255,255,.86))}
+    .message-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    .message-author{display:flex;align-items:center;gap:10px;font-weight:850}
+    .avatar-dot{display:grid;place-items:center;width:38px;height:38px;border-radius:14px;color:#fff;background:linear-gradient(145deg,var(--primary),var(--accent));font-weight:900}
+    .role-badge,.pin-badge{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:999px;font-size:.74rem;font-weight:850}
+    .role-badge{background:#eef2ff;color:#4f46e5}.pin-badge{background:#fff7ed;color:#c2410c}
+    .message-content{margin:12px 0;color:#26314d;line-height:1.6;white-space:pre-wrap}.message-time{color:var(--muted);font-size:.82rem}
+    .pin-button{border:1px solid #eee7ff;border-radius:10px;background:#fff;color:#59657b;padding:7px 10px;font-weight:800}
+    .pin-button:hover{color:#e11d48;background:#fff1f2}
+    .comment-box textarea{min-height:120px;border-color:#e4ddf5;border-radius:16px;background:rgba(255,255,255,.86)}
+    @@media(max-width:900px){.details-hero{grid-template-columns:1fr}.details-cover{max-height:360px}.meta-grid{grid-template-columns:1fr}}
+</style>
+<main class="details-shell">
+    @if (TempData["SuccessMessage"] is string success) { <div class="alert alert-success" role="status">@success</div> }
+    @if (TempData["ErrorMessage"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
 
-<!DOCTYPE html>
-<html lang="en">
-
-  
-
-
-<head>
-   
-
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <title>Etkinlik Detayları</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
-    <link rel="stylesheet" href="~/css/style4.css">
-    
-    <style>
-        #map {
-            height: 400px;
-            width: 100%;
-            margin-top: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        .travel-options {
-            margin-top: 20px;
-        }
-
-        .travel-time {
-            margin-top: 10px;
-            font-weight: bold;
-        }
-    </style>
-</head>
-
-<body>
-     <script>
-        $(document).ready(function () {
-        @if (TempData["SuccessMessage"] != null)
-        {
-            <text>
-                        toastr.success('@TempData["SuccessMessage"]', 'Başarılı');
-            </text>
-        }
-        @if (TempData["ErrorMessage"] != null)
-        {
-            <text>
-                        toastr.error('@TempData["ErrorMessage"]', 'Hata');
-            </text>
-        }
-            });
-    </script>
-
-    <div class="container mt-5">
-        <div class="row align-items-center">
-            <!-- Sol Kısım: Fotoğraf -->
-            <div class="col-md-4">
-                <img src="@(!string.IsNullOrEmpty(Model.ImageUrl) ? Model.ImageUrl : "/images/default-event.jpg")"
-                     alt="@Model.Name" class="img-fluid rounded shadow" style="width: 100%; max-height: 400px; object-fit: cover;">
+    <section class="details-hero">
+        <img class="details-cover" src="@(Model.ImageUrl ?? "/images/default-event.jpg")" alt="@Model.Name">
+        <div class="details-copy">
+            <div>
+                <div class="eyebrow">Etkinlik Detayı</div>
+                <h1>@Model.Name</h1>
             </div>
-
-            <!-- Sağ Kısım: Bilgiler -->
-            <div class="col-md-8">
-                <h2 class="event-title">@Model.Name</h2>
-                <div>
-                    <div>
-                        <i class="bi bi-calendar-date-fill"></i>
-                        @Model.Date.ToString("dd MMMM yyyy") @Model.Date.ToString("HH:mm")
-                    </div>
-                    <div>
-                        <i class="bi bi-geo-alt-fill text-danger"></i>
-                        <span>@Model.Location</span>
-                    </div>
-                </div>
-
-            
-
-                <label for="startLocation" class="form-label">Başlangıç Konumu:</label>
-                <input id="startLocation" type="text" class="form-control mb-3" placeholder="Başlangıç konumunu girin veya seçin">
-                <!-- Ulaşım Modu Seçenekleri -->
-                <div class="travel-options">
-                    <label for="travelMode">Ulaşım Modu:</label>
-                    <select id="travelMode" class="form-select">
-                        <option value="DRIVING">Araba ile</option>
-                        <option value="WALKING">Yürüyerek</option>
-                        <option value="TRANSIT">Toplu Taşıma</option>
-                        <option value="BICYCLING">Bisiklet ile</option>
-                    </select>
-                </div>
-
-                <!-- Yolculuk Süresi -->
-                <div id="travelTime" class="travel-time text-primary"></div>
+            <p class="details-description">@(string.IsNullOrWhiteSpace(Model.Description) ? "Bu etkinlik için henüz açıklama eklenmemiş." : Model.Description)</p>
+            <div class="status-row">
+                <span class="soft-pill">@Model.Status</span>
+                <span class="soft-pill owner-pill">Kurucu: @(Model.CreatedByUser?.UserName ?? "Bilinmiyor")</span>
             </div>
-            <form method="post" action="/Event/JoinEvent">
-                <input type="hidden" name="EtkinlikId" value="@Model.Id" />
-                <button type="submit" class="btn btn-success">Katıl</button>
-            </form>
-
-        </div>
-        <!-- Yorumlar Bölümü -->
-        <div class="comments-section mt-5">
-            <h4>Mesajlar</h4>
-
-            <!-- Mevcut Yorumlar -->
-            <div id="commentsList">
-                @if (Model != null && Model.Messages != null && Model.Messages.Any())
+            <div class="meta-grid">
+                <div class="meta-card"><span>Tarih</span><strong>@Model.Date.ToString("dd MMMM yyyy HH:mm")</strong></div>
+                <div class="meta-card"><span>Süre</span><strong>@($"{(int)Model.Duration.TotalHours} saat {Model.Duration.Minutes} dk")</strong></div>
+                <div class="meta-card"><span>Adres</span><strong>@Model.Location</strong></div>
+                <div class="meta-card"><span>Katılım</span><strong>@registeredCount kişi@(Model.MaxParticipants is > 0 ? $" / {Model.MaxParticipants} kontenjan" : "")</strong></div>
+            </div>
+            <div class="action-panel">
+                @if (!isOwner && Model.Status == EventStatus.Approved && Model.Date > DateTime.Now)
                 {
-                    foreach (var yorum in Model.Messages.OrderBy(y => y.SentDate))
+                    if (participation?.Status == ParticipationStatus.Registered)
                     {
-                        <div class="comment mb-3 p-3 bg-light border rounded">
-                            <p><strong>@yorum.Sender.UserName:</strong> @yorum.Content</p>
-                            <small class="text-muted">@yorum.SentDate.ToString("dd MMM yyyy HH:mm")</small>
-                        </div>
+                        <form asp-action="LeaveEvent" method="post"><input type="hidden" name="etkinlikId" value="@Model.Id"><button class="btn btn-outline-danger" type="submit">Katılımdan ayrıl</button></form>
+                    }
+                    else
+                    {
+                        <form asp-action="JoinEvent" method="post"><input type="hidden" name="EtkinlikId" value="@Model.Id"><button class="btn-primary-modern" type="submit">Katıl</button></form>
                     }
                 }
-                else
-                {
-                    <p>Henüz mesaj atılmamış. İlk mesajı siz atabilirsiniz!</p>
-                }
-            </div>
-
-            <!-- Yeni Yorum Ekle -->
-            <div class="new-comment mt-4">
-                <h5>Yorum Yap</h5>
-                <form id="commentForm" method="post" action="/Event/AddComment">
-                    <input type="hidden" name="EtkinlikId" value="@Model.Id" />
-                    <textarea name="Content" class="form-control mb-3" rows="4" placeholder="Mesajınızı yazın..." required></textarea>
-                    <button type="submit" class="btn btn-primary">Gönder</button>
-                </form>
             </div>
         </div>
+    </section>
 
+    <section class="details-card">
+        <div class="community-head">
+            <div><h2>Konum</h2><p id="mapHint">Etkinlik adresini haritada görüntüle.</p></div>
+        </div>
+        <div id="map" aria-label="Etkinlik konumu"></div>
+    </section>
 
-        
+    @if (isOwner && eventEnded && Model.Status == EventStatus.Approved)
+    {
+        <section class="details-card">
+            <div class="community-head"><div><h2>Katılımı doğrula</h2><p>Etkinlik sonrası yoklamayı tamamla.</p></div></div>
+            <form asp-action="ConfirmAttendance" method="post">
+                <input type="hidden" name="eventId" value="@Model.Id">
+                <div class="row g-2">
+                    @foreach (var attendee in Model.Participants.Where(item => item.Status == ParticipationStatus.Registered))
+                    {
+                        <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" name="attendedUserIds" value="@attendee.KullaniciId" id="attendee-@attendee.KullaniciId"><label class="form-check-label" for="attendee-@attendee.KullaniciId">@attendee.Kullanici.UserName</label></div></div>
+                    }
+                </div>
+                <button class="btn-primary-modern mt-3" type="submit">Yoklamayı tamamla</button>
+            </form>
+        </section>
+    }
 
-        <!-- Google Maps -->
-        <div id="map"></div>
-        
-       
-    </div>
+</main>
 
-    <!-- Google Maps API -->
-    <script async
-            src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRXYjVWKwDEIRF1bA9JeCLsI78Nc9ycrk&callback=initMap&libraries=places">
-    </script>
-
+@section Scripts {
+    <script src="~/vendor/leaflet/leaflet.js"></script>
     <script>
-        let map, directionsService, directionsRenderer, geocoder, autocomplete;
+        const eventAddress = @Html.Raw(JsonSerializer.Serialize(Model.Location ?? ""));
+        const savedLocation = [
+            @Model.Latitude.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            @Model.Longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        ];
+        const hasSavedLocation = savedLocation[0] !== 0 || savedLocation[1] !== 0;
+        const mapHint = document.getElementById('mapHint');
+        const defaultTurkeyCenter = [39.0, 35.0];
+        const map = L.map('map').setView(hasSavedLocation ? savedLocation : defaultTurkeyCenter, hasSavedLocation ? 14 : 6);
+        L.tileLayer('/map-tiles/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
 
-        function initMap() {
-            // Google Maps Servislerini Başlat
-            directionsService = new google.maps.DirectionsService();
-            directionsRenderer = new google.maps.DirectionsRenderer();
-            geocoder = new google.maps.Geocoder();
+        let eventMarker = null;
+        const setEventMarker = (point, zoom = 14) => {
+            eventMarker = eventMarker || L.marker(point).addTo(map);
+            eventMarker.setLatLng(point);
+            map.setView(point, zoom);
+        };
 
-            // Haritayı Yükle
-            map = new google.maps.Map(document.getElementById("map"), {
-                center: { lat: 39.92077, lng: 32.85411 }, // Türkiye merkezi
-                zoom: 14,
-            });
-
-            // DirectionsRenderer'ı Haritaya Bağla
-            directionsRenderer.setMap(map);
-
-            // Başlangıç Konumu için Google Places Autocomplete
-            const startLocationInput = document.getElementById("startLocation");
-            autocomplete = new google.maps.places.Autocomplete(startLocationInput);
-
-            // Rota Oluşturma Olayı
-            document.getElementById("travelMode").addEventListener("change", updateRoute);
-            startLocationInput.addEventListener("change", updateRoute);
-        }
-
-        function updateRoute() {
-            const startLocationInput = document.getElementById("startLocation").value;
-            const travelMode = document.getElementById("travelMode").value;
-
-            // Etkinlik Konumu (Adres olarak)
-            const eventAddress = "@Model.Location";
-
-            if (startLocationInput) {
-                geocoder.geocode({ address: startLocationInput }, (startResults, status) => {
-                    if (status === "OK") {
-                        const userLocation = startResults[0].geometry.location;
-
-                        geocoder.geocode({ address: eventAddress }, (eventResults, status) => {
-                            if (status === "OK") {
-                                const eventLocation = eventResults[0].geometry.location;
-                                calculateAndDisplayRoute(userLocation, eventLocation, travelMode);
-                            } else {
-                                alert("Etkinlik adresi bulunamadı: " + status);
-                            }
-                        });
-                    } else {
-                        alert("Başlangıç adresi bulunamadı: " + status);
+        if (hasSavedLocation) {
+            setEventMarker(savedLocation);
+        } else if (eventAddress.trim().length >= 3) {
+            mapHint.textContent = 'Kayıtlı koordinat yok; adres üzerinden yaklaşık konum aranıyor.';
+            fetch(`/api/locations/search?q=${encodeURIComponent(eventAddress)}`)
+                .then(response => response.ok ? response.json() : [])
+                .then(results => {
+                    const firstResult = results && results[0];
+                    if (!firstResult) {
+                        mapHint.textContent = 'Bu adres için harita konumu bulunamadı. Etkinliği düzenleyip haritadan nokta seçebilirsin.';
+                        return;
                     }
+
+                    setEventMarker([firstResult.latitude, firstResult.longitude]);
+                    mapHint.textContent = firstResult.displayName || 'Adres haritada yaklaşık olarak gösteriliyor.';
+                })
+                .catch(() => {
+                    mapHint.textContent = 'Adres haritada bulunamadı. Etkinliği düzenleyip haritadan nokta seçebilirsin.';
                 });
-            } else {
-                alert("Lütfen başlangıç konumunu girin.");
-            }
+        } else {
+            mapHint.textContent = 'Bu etkinlik için kayıtlı adres/koordinat yok.';
         }
 
-        function calculateAndDisplayRoute(userLocation, eventLocation, travelMode) {
-            directionsService.route(
-                {
-                    origin: userLocation,
-                    destination: eventLocation,
-                    travelMode: google.maps.TravelMode[travelMode],
-                },
-                (response, status) => {
-                    if (status === "OK") {
-                        directionsRenderer.setDirections(response);
-
-                        // Yolculuk Süresini Göster
-                        const duration = response.routes[0].legs[0].duration.text;
-                        document.getElementById("travelTime").innerText = `Yolculuk Süresi: ${duration}`;
-                    } else {
-                        alert("Rota oluşturulamadı: " + status);
-                    }
-                }
-            );
-        }
-
-        toastr.options = {
-        "closeButton": true, // Kapatma butonu
-        "debug": false, // Hata ayıklama
-        "newestOnTop": true, // En yeni bildirim en üstte
-        "progressBar": true, // İlerleme çubuğu
-        "positionClass": "toast-top-right", // Konum
-        "preventDuplicates": true, // Aynı bildirimlerin tekrarını engelle
-        "onclick": null, // Tıklama işlevi
-        "showDuration": "300", // Gösterim süresi (ms)
-        "hideDuration": "1000", // Kaybolma süresi (ms)
-        "timeOut": "5000", // Ekranda kalma süresi (ms)
-        "extendedTimeOut": "1000", // Fare üzerine gelindiğinde ek süre (ms)
-        "showEasing": "swing", // Gösterim animasyonu
-        "hideEasing": "linear", // Kaybolma animasyonu
-        "showMethod": "fadeIn", // Gösterim metodu
-        "hideMethod": "fadeOut" // Kaybolma metodu
-    };  
-
+        setTimeout(() => map.invalidateSize(), 150);
     </script>
-</body>
-
-</html>
+}

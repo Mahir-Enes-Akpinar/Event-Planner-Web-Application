@@ -1,77 +1,152 @@
-﻿@model WebApplication1.Models.Kullanici
-
+@model WebApplication1.Models.Kullanici
+@inject IConfiguration Configuration
+@using System.Text.Json
 @{
+    ViewData["Title"] = "Profilim";
     Layout = "~/Views/Shared/UserLayout.cshtml";
     var totalScore = ViewData["TotalScore"] ?? 0;
+    var hasProfilePicture = !string.IsNullOrWhiteSpace(Model.ProfilePicture) && !Model.ProfilePicture.Contains("default-profile", StringComparison.OrdinalIgnoreCase);
 }
+<link rel="stylesheet" href="~/vendor/leaflet/leaflet.css">
 <style>
-    .profile-picture-container {
-        padding: 10px;
-        border: 2px solid #ddd;
-        border-radius: 50%;
-        display: inline-block;
-    }
+    .profile-grid{display:grid;grid-template-columns:330px 1fr;gap:24px}
+    .profile-card,.profile-form-card,.danger-zone{border:1px solid rgba(255,255,255,.78);border-radius:26px;background:rgba(255,255,255,.68);box-shadow:0 22px 54px rgba(51,35,114,.1);backdrop-filter:blur(20px)}
+    .profile-card{padding:24px;text-align:center}
+    .profile-photo,.profile-icon{width:132px;height:132px;margin:auto;border:5px solid #fff;border-radius:38px;box-shadow:0 16px 34px rgba(109,93,252,.18)}
+    .profile-photo{object-fit:cover}
+    .profile-icon{display:grid;place-items:center;color:#fff;background:linear-gradient(145deg,var(--primary),var(--accent));font-size:3.2rem;font-weight:900}
+    .score-box{padding:16px;border-radius:20px;background:linear-gradient(135deg,#fff7ed,#f4f3ff)}
+    .score-box strong{font-size:2rem;color:#6d5dfc}
+    .profile-form-card{padding:24px}
+    .form-control,.form-select{border-color:#e4ddf5;border-radius:14px;background:rgba(255,255,255,.88)}
+    .form-control:focus,.form-select:focus{border-color:#ff6b6b;box-shadow:0 0 0 .22rem rgba(255,107,107,.14)}
+    .location-search{position:relative}
+    .address-suggestions{position:absolute;z-index:1000;left:0;right:0;top:100%;overflow:hidden;max-height:230px;overflow-y:auto;border:1px solid #ded8f3;border-radius:0 0 14px 14px;background:#fff;box-shadow:0 14px 28px rgba(51,35,114,.14)}
+    .address-suggestions button{display:block;width:100%;padding:.72rem .95rem;border:0;background:#fff;text-align:left;font-size:.9rem}
+    .address-suggestions button:hover{background:#fff1f2;color:#e11d48}
+    #profileMap{height:310px;border:2px solid #e7e0ff;border-radius:18px;box-shadow:0 14px 30px rgba(51,35,114,.08)}
+    .danger-zone{margin-top:24px;padding:22px;border-color:rgba(255,107,107,.34)}
+    @@media(max-width:960px){.profile-grid{grid-template-columns:1fr}}
 </style>
-
-<head>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bokor&family=Itim&family=Protest+Revolution&display=swap" rel="stylesheet">
-    <!-- Bootstrap JavaScript -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-  
-    <link rel="stylesheet" href="~/css/style4.css">
-</head>
-<div class="container mt-5">
-   
-    <div class="row">
-        <!-- Sol Kısım: Profil Resmi ve Puan -->
-        <div class="col-md-4 text-center">
-            <div class="profile-picture-container mb-4">
-                <img src="@(!string.IsNullOrEmpty(Model.ProfilePicture) ? Model.ProfilePicture : "~/images/default-profile.jpg")"
-                     alt="Profil Resmi" class="img-fluid rounded-circle shadow" style="width: 150px; height: 150px; object-fit: cover;">
-            </div>
-            <h3>@Model.FirstName @Model.LastName</h3>
-            <p class="text-muted">Toplam Puan: <strong>@totalScore</strong></p>
-        </div>
-
-        <!-- Sağ Kısım: Bilgi Güncelleme -->
-        <div class="col-md-8">
-            <h4>Profil Bilgilerini Güncelle</h4>
-            <form method="post" action="/User/UpdateProfile" enctype="multipart/form-data">
-                <div class="mb-3">
-                    <label for="FirstName" class="form-label">Ad</label>
-                    <input type="text" id="FirstName" name="FirstName" class="form-control" value="@Model.FirstName" required>
-                </div>
-                <div class="mb-3">
-                    <label for="LastName" class="form-label">Soyad</label>
-                    <input type="text" id="LastName" name="LastName" class="form-control" value="@Model.LastName" required>
-                </div>
-                <div class="mb-3">
-                    <label for="BirthDate" class="form-label">Doğum Tarihi</label>
-                    <input type="date" id="BirthDate" name="BirthDate" class="form-control" value="@Model.BirthDate.ToString("yyyy-MM-dd")" required>
-                </div>
-                <div class="mb-3">
-                    <label for="Gender" class="form-label">Cinsiyet</label>
-                    <input type="text" id="Gender" name="Gender" class="form-control" value="@Model.Gender" required>
-                </div>
-                <div class="mb-3">
-                    <label for="PhoneNumber" class="form-label">Telefon Numarası</label>
-                    <input type="text" id="PhoneNumber" name="PhoneNumber" class="form-control" value="@Model.PhoneNumber">
-                </div>
-                <div class="mb-3">
-                    <label for="Location" class="form-label">Konum</label>
-                    <input type="text" id="Location" name="Location" class="form-control" value="@Model.Location">
-                </div>
-                <div class="mb-3">
-                    <label for="ProfilePicture" class="form-label">Profil Resmi URL</label>
-                    <input type="file" class="form-control" id="profileImage" name="profileImage"> <!-- Resim yükleme -->
-                    
-                </div>
-                <button type="submit" class="btn btn-primary">Güncelle</button>
-            </form>
-        </div>
-    </div>
+<div class="page-heading">
+    <div><div class="eyebrow">Hesabım</div><h1>Profilim</h1><p>Bilgilerini güncel tut, etkinlik önerileri ve yakınındaki etkinlikler daha iyi çalışsın.</p></div>
 </div>
+@if (TempData["SuccessMessage"] is string success) { <div class="alert alert-success">@success</div> }
+@if (TempData["ErrorMessage"] is string error) { <div class="alert alert-danger">@error</div> }
+
+<div class="profile-grid">
+    <aside class="profile-card">
+        @if (hasProfilePicture)
+        {
+            <img class="profile-photo" src="@Model.ProfilePicture" alt="Profil fotoğrafı">
+        }
+        else
+        {
+            <div class="profile-icon" aria-hidden="true">👤</div>
+        }
+        <h2 class="h4 mt-3 mb-1">@Model.FirstName @Model.LastName</h2>
+        <p class="text-muted mb-3">@@@Model.UserName</p>
+        <div class="score-box"><div class="small text-muted">Toplam puan</div><strong>@totalScore</strong></div>
+        <p class="small text-muted mt-3 mb-0">Konumunu seçersen yakınındaki etkinlikler ana sayfada daha doğru görünür.</p>
+    </aside>
+
+    <section class="profile-form-card">
+        <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
+            <div><h2 class="h4 mb-1">Profil bilgileri</h2><p class="text-muted small mb-0">Kişisel bilgilerini ve konumunu buradan düzenleyebilirsin.</p></div>
+            <span class="badge rounded-pill text-bg-light">@Model.Email</span>
+        </div>
+        <form method="post" asp-action="UpdateProfile" asp-controller="User" enctype="multipart/form-data">
+            <div class="row g-3">
+                <div class="col-md-6"><label class="form-label fw-semibold" for="FirstName">Ad</label><input class="form-control" id="FirstName" name="FirstName" value="@Model.FirstName" maxlength="50" required></div>
+                <div class="col-md-6"><label class="form-label fw-semibold" for="LastName">Soyad</label><input class="form-control" id="LastName" name="LastName" value="@Model.LastName" maxlength="50" required></div>
+                <div class="col-md-6"><label class="form-label fw-semibold" for="BirthDate">Doğum tarihi</label><input class="form-control" id="BirthDate" name="BirthDate" type="date" value="@Model.BirthDate.ToString("yyyy-MM-dd")" required></div>
+                <div class="col-md-6"><label class="form-label fw-semibold" for="Gender">Cinsiyet</label><select class="form-select" id="Gender" name="Gender" required><option value="Belirtilmedi" selected="@(Model.Gender == "Belirtilmedi" ? "selected" : null)">Belirtmek istemiyorum</option><option value="Kadın" selected="@(Model.Gender == "Kadın" ? "selected" : null)">Kadın</option><option value="Erkek" selected="@(Model.Gender == "Erkek" ? "selected" : null)">Erkek</option><option value="Diğer" selected="@(Model.Gender == "Diğer" ? "selected" : null)">Diğer</option></select></div>
+                <div class="col-md-6"><label class="form-label fw-semibold" for="PhoneNumber">Telefon</label><input class="form-control" id="PhoneNumber" name="PhoneNumber" value="@Model.PhoneNumber" maxlength="15" type="tel" placeholder="İsteğe bağlı"></div>
+                <div class="col-md-6"><label class="form-label fw-semibold" for="profileImage">Profil fotoğrafı</label><input class="form-control" id="profileImage" name="profileImage" type="file" accept="image/jpeg,image/png,image/webp"></div>
+                <div class="col-12 location-search"><label class="form-label fw-semibold" for="Location">Konum</label><input autocomplete="off" class="form-control" id="Location" name="Location" value="@Model.Location" maxlength="250" placeholder="Şehir, ilçe veya mahalle ara"><div id="profileLocationSuggestions" class="address-suggestions" hidden></div></div>
+                <input type="hidden" id="Latitude" name="latitude" value="@(Model.Latitude?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "0")">
+                <input type="hidden" id="Longitude" name="longitude" value="@(Model.Longitude?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "0")">
+                <div class="col-12"><div id="profileMap" aria-label="Profil konumu haritası"></div><div class="form-text mt-2">Önerilerden seçim yapabilir veya haritaya tıklayabilirsin.</div></div>
+            </div>
+            <div class="d-flex justify-content-end mt-4"><button class="btn-primary-modern" type="submit">Değişiklikleri kaydet</button></div>
+        </form>
+    </section>
+</div>
+
+<section class="danger-zone">
+    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+        <div><h2 class="h5 mb-1 text-danger">Hesabı kapat</h2><p class="text-muted small mb-0">Hesabın devre dışı bırakılır, kişisel verilerin 30 gün sonra anonimleştirilir.</p></div>
+        <form asp-action="DeleteAccount" asp-controller="User" method="post"><button type="submit" class="btn btn-outline-danger">Hesabımı kapat</button></form>
+    </div>
+</section>
+
+@section Scripts {
+<script src="~/vendor/leaflet/leaflet.js"></script>
+<script>
+const latInput = document.getElementById('Latitude');
+const lonInput = document.getElementById('Longitude');
+const locationInput = document.getElementById('Location');
+const suggestions = document.getElementById('profileLocationSuggestions');
+const initial = [Number(latInput.value), Number(lonInput.value)];
+const hasInitial = initial[0] !== 0 || initial[1] !== 0;
+const map = L.map('profileMap').setView(hasInitial ? initial : [39, 35], hasInitial ? 13 : 6);
+L.tileLayer('/map-tiles/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+}).addTo(map);
+setTimeout(() => map.invalidateSize(), 150);
+let marker = hasInitial ? L.marker(initial).addTo(map) : null;
+let searchTimer;
+
+function setLocation(latitude, longitude, address, zoom = 14) {
+    latInput.value = latitude;
+    lonInput.value = longitude;
+    if (address) locationInput.value = address;
+    marker ??= L.marker([latitude, longitude]).addTo(map);
+    marker.setLatLng([latitude, longitude]);
+    map.setView([latitude, longitude], zoom);
+}
+
+locationInput.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const query = locationInput.value.trim();
+    if (query.length < 3) {
+        suggestions.hidden = true;
+        return;
+    }
+    searchTimer = setTimeout(async () => {
+        try {
+            const response = await fetch(`/api/locations/search?q=${encodeURIComponent(query)}`);
+            if (!response.ok) return;
+            const results = await response.json();
+            suggestions.innerHTML = '';
+            results.forEach(result => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = result.displayName;
+                button.addEventListener('click', () => {
+                    setLocation(result.latitude, result.longitude, result.displayName);
+                    suggestions.hidden = true;
+                });
+                suggestions.appendChild(button);
+            });
+            suggestions.hidden = results.length === 0;
+        } catch {
+            suggestions.hidden = true;
+        }
+    }, 300);
+});
+
+document.addEventListener('click', event => {
+    if (!event.target.closest('.location-search')) suggestions.hidden = true;
+});
+
+map.on('click', async event => {
+    setLocation(event.latlng.lat, event.latlng.lng, null, 15);
+    try {
+        const response = await fetch(`/api/locations/reverse?lat=${event.latlng.lat}&lon=${event.latlng.lng}`);
+        if (response.ok) locationInput.value = (await response.json()).displayName;
+    } catch { }
+});
+</script>
+}

@@ -1,96 +1,74 @@
-﻿@{
+@inject IConfiguration Configuration
+@using System.Text.Json
+@{
     ViewData["Title"] = "Etkinlik Haritası";
     Layout = "~/Views/Shared/UserLayout.cshtml";
 }
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Etkinlik Haritası</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
-
-    <style>
-        #map {
-            height: 600px;
-            width: 100%;
-            margin-top: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-        .info-window {
-            font-size: 14px;
-        }
-        .info-window h5 {
-            margin-bottom: 10px;
-        }
-        .info-window img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 10px;
-            margin-bottom: 10px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container mt-5">
-        <h2 class="text-center mb-4">Etkinlik Haritası</h2>
-        <div id="map"></div>
+<link rel="stylesheet" href="~/vendor/leaflet/leaflet.css">
+<style>
+    .map-shell{display:grid;gap:18px}
+    .map-header{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:end;padding:26px;border:1px solid rgba(255,255,255,.76);border-radius:28px;background:linear-gradient(135deg,rgba(255,255,255,.72),rgba(255,255,255,.38));box-shadow:0 24px 60px rgba(51,35,114,.12);backdrop-filter:blur(20px)}
+    .map-header h1{margin:0;font-weight:900;letter-spacing:-.045em}
+    .map-header p{margin:8px 0 0;color:var(--muted)}
+    .map-count{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 16px;border-radius:999px;color:#fff;background:linear-gradient(135deg,var(--teal),var(--primary));font-weight:850;box-shadow:0 14px 30px rgba(15,185,177,.2)}
+    .map-panel{overflow:hidden;border:1px solid rgba(255,255,255,.78);border-radius:28px;background:rgba(255,255,255,.62);box-shadow:0 26px 70px rgba(51,35,114,.13);backdrop-filter:blur(20px)}
+    .map-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px;border-bottom:1px solid rgba(232,229,245,.85)}
+    .map-toolbar strong{color:var(--navy)}
+    .map-toolbar span{color:var(--muted);font-size:.9rem}
+    #map{height:min(68vh,680px);min-height:470px}
+    .leaflet-popup-content-wrapper{border-radius:16px;box-shadow:0 16px 36px rgba(51,35,114,.18)}
+    .map-popup-title{display:block;margin-bottom:8px;color:#151b2d;font-size:1rem}
+    .map-popup-address{margin:0 0 10px;color:#6d7488}
+    .map-popup-link{display:inline-flex;padding:7px 10px;border-radius:10px;color:#fff;background:#6d5dfc;text-decoration:none;font-weight:750}
+    @@media(max-width:720px){.map-header{grid-template-columns:1fr}.map-toolbar{align-items:flex-start;flex-direction:column}#map{height:560px;min-height:420px}}
+</style>
+<section class="map-shell">
+    <div class="map-header">
+        <div>
+            <div class="eyebrow">Harita</div>
+            <h1>Etkinlikleri haritada keşfet</h1>
+            <p>Onaylanmış etkinlikleri konumlarına göre görüntüle, sana yakın olanları hızlıca yakala.</p>
+        </div>
+        <div class="map-count"><span id="eventCount">0</span>&nbsp;etkinlik</div>
     </div>
-
-    <script async
-            src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRXYjVWKwDEIRF1bA9JeCLsI78Nc9ycrk&callback=initMap">
-    </script>
+    <div class="map-panel">
+        <div class="map-toolbar">
+            <div><strong>Canlı etkinlik haritası</strong><br><span>İşaretçilere tıklayarak detaylara geçebilirsin.</span></div>
+            <a class="btn-primary-modern" asp-controller="Event" asp-action="AddEvent">Yeni etkinlik</a>
+        </div>
+        <div id="map" aria-label="Onaylanmış etkinlikler haritası"></div>
+    </div>
+</section>
+@section Scripts {
+    <script src="~/vendor/leaflet/leaflet.js"></script>
     <script>
-        let map;
+        const events = @Html.Raw(ViewData["EtkinliklerJson"] ?? "[]");
+        document.getElementById('eventCount').textContent = events.length;
+        const map = L.map('map', { scrollWheelZoom: true }).setView([39, 35], 6);
+        L.tileLayer('/map-tiles/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
 
-        function initMap() {
-            const etkinlikler = @Html.Raw(ViewData["EtkinliklerJson"]);
-
-            // Haritayı başlat
-            map = new google.maps.Map(document.getElementById("map"), {
-                center: { lat: 39.92077, lng: 32.85411 }, // Türkiye merkezi
-                zoom: 7,
-            });
-
-            const geocoder = new google.maps.Geocoder();
-
-            etkinlikler.forEach(etkinlik => {
-                geocoder.geocode({ address: etkinlik.Location }, function (results, status) {
-                    if (status === "OK") {
-                        const marker = new google.maps.Marker({
-                            position: results[0].geometry.location,
-                            map: map,
-                            title: etkinlik.Name,
-                        });
-
-                        const infoWindow = new google.maps.InfoWindow({
-                            content: `
-                                <div class="info-window">
-                                    <h5>${etkinlik.Name}</h5>
-                                    <img src="${etkinlik.ImageUrl ?? '/images/default-event.jpg'}" alt="${etkinlik.Name}">
-                                    <p><strong>Tarih:</strong> ${new Date(etkinlik.Date).toLocaleDateString()}</p>
-                                    <p><strong>Saat:</strong> ${etkinlik.Duration}</p>
-                                    <p><strong>Açıklama:</strong> ${etkinlik.Description}</p>
-                                    <a href="/Event/Details/${etkinlik.Id}" class="btn btn-primary btn-sm">Detayları Gör</a>
-                                </div>
-                            `,
-                        });
-
-                        marker.addListener("click", function () {
-                            infoWindow.open(map, marker);
-                        });
-                    } else {
-                        console.error("Geocode failed: " + status);
-                    }
-                });
-            });
-        }
+        const bounds = [];
+        events.filter(eventItem => eventItem.Latitude && eventItem.Longitude).forEach(eventItem => {
+            const point = [eventItem.Latitude, eventItem.Longitude];
+            bounds.push(point);
+            const content = document.createElement('div');
+            const title = document.createElement('strong');
+            title.className = 'map-popup-title';
+            title.textContent = eventItem.Name;
+            const address = document.createElement('p');
+            address.className = 'map-popup-address';
+            address.textContent = eventItem.Location;
+            const link = document.createElement('a');
+            link.className = 'map-popup-link';
+            link.href = `/Event/Details/${encodeURIComponent(eventItem.Id)}`;
+            link.textContent = 'Detayları gör';
+            content.append(title, address, link);
+            L.marker(point).addTo(map).bindPopup(content);
+        });
+        if (bounds.length) map.fitBounds(bounds, { padding: [40, 40] });
+        setTimeout(() => map.invalidateSize(), 150);
     </script>
-</body>
-</html>
+}

@@ -37,21 +37,25 @@
         <h3>Admin Paneli</h3>
         <div class="list-group mt-4">
             <a href="@Url.Action("Index", "Admin")" 
-               class="list-group-item list-group-item-action text-white @(ViewContext.RouteData.Values["action"].ToString() == "Index" ? "bg-primary" : "bg-secondary")">
+               class="list-group-item list-group-item-action text-white @(ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "bg-primary" : "bg-secondary")">
                <i class="bi bi-speedometer2"></i> Dashboard
             </a>
             <a href="@Url.Action("Users", "Admin")" 
-               class="list-group-item list-group-item-action text-white @(ViewContext.RouteData.Values["action"].ToString() == "Users" ? "bg-primary" : "bg-secondary")">
+               class="list-group-item list-group-item-action text-white @(ViewContext.RouteData.Values["action"]?.ToString() == "Users" ? "bg-primary" : "bg-secondary")">
                <i class="bi bi-people"></i> Kullanıcı Yönetimi
             </a>
             <a href="@Url.Action("Events", "Admin")" 
-               class="list-group-item list-group-item-action text-white @(ViewContext.RouteData.Values["action"].ToString() == "Events" ? "bg-primary " : "bg-secondary")">
+               class="list-group-item list-group-item-action text-white @(ViewContext.RouteData.Values["action"]?.ToString() == "Events" ? "bg-primary " : "bg-secondary")">
                <i class="bi bi-calendar-event"></i> Etkinlik Yönetimi
             </a>
-            <a href="@Url.Action("Logout", "Home")" 
-               class="list-group-item list-group-item-action text-danger bg-secondary">
-               <i class="bi bi-box-arrow-left"></i> Çıkış Yap
+            <a asp-controller="Admin" asp-action="Categories" class="list-group-item list-group-item-action text-white bg-secondary">
+                <i class="bi bi-tags"></i> Kategori Yönetimi
             </a>
+            <form asp-controller="Home" asp-action="Logout" method="post">
+                <button type="submit" class="list-group-item list-group-item-action text-danger bg-secondary">
+                    <i class="bi bi-box-arrow-left"></i> Çıkış Yap
+                </button>
+            </form>
         </div>
     </div>
 

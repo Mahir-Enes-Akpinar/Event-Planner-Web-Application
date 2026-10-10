@@ -3,8 +3,8 @@
 @{
     ViewData["Title"] = "Etkinlik Güncelle - Admin";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var categories = ViewBag.Categories as IEnumerable<Kategori> ?? Enumerable.Empty<Kategori>();
 }
-<head>
 
     <!-- Hata Measj teaster entegre-->
 
@@ -13,19 +13,18 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 
 
-</head>
 <script>
     $(document).ready(function () {
     @if (TempData["SuccessMessage"] != null)
     {
         <text>
-                    toastr.success('@TempData["SuccessMessage"]', 'Başarılı');
+                        toastr.success(@Json.Serialize(TempData["SuccessMessage"]), 'Başarılı');
         </text>
     }
     @if (TempData["ErrorMessage"] != null)
     {
         <text>
-                    toastr.error('@TempData["ErrorMessage"]', 'Hata');
+                        toastr.error(@Json.Serialize(TempData["ErrorMessage"]), 'Hata');
         </text>
     }
                     });
@@ -36,6 +35,7 @@
 
     <form asp-action="EditEvent" method="post" enctype="multipart/form-data">
         <input type="hidden" name="id" value="@Model.Id" />
+        <input type="hidden" name="RowVersion" value="@Convert.ToBase64String(Model.RowVersion ?? Array.Empty<byte>())" />
 
         <div class="mb-3">
             <label for="Name" class="form-label">Etkinlik Adı</label>
@@ -57,7 +57,7 @@
             <label for="Category" class="form-label">Kategori</label>
             <select class="form-select" id="Category" name="selectedCategoryId" required>
                 <option value="" disabled selected>Kategori seçin</option>
-                @foreach (var category in ViewBag.Categories as List<WebApplication1.Models.Kategori>)
+                @foreach (var category in categories)
                 {
                     <option value="@category.Id">@category.Name</option>
                 }

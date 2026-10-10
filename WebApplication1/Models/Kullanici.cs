@@ -1,59 +1,55 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.AspNetCore.Identity;
 
 namespace WebApplication1.Models
 {
-    public class Kullanici
+    public class Kullanici : IdentityUser<int>
     {
-        [Key]
-        public int Id { get; set; } // Benzersiz Kullanıcı ID
+        [MaxLength(250)]
+        public string? Location { get; set; }
+
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
 
         [Required]
         [MaxLength(50)]
-        public string UserName { get; set; } // Kullanıcı adı
-
-        [Required]
-        [MaxLength(256)]
-        public string Password { get; set; } // Şifre (Hashlenmiş)
-
-        [Required]
-        [EmailAddress]
-        [MaxLength(100)]
-        public string Email { get; set; } // E-posta adresi
-
-        public string Location { get; set; } // Konum
+        public string FirstName { get; set; } = string.Empty;
 
         [Required]
         [MaxLength(50)]
-        public string FirstName { get; set; } // Ad
-
-        [Required]
-        [MaxLength(50)]
-        public string LastName { get; set; } // Soyad
+        public string LastName { get; set; } = string.Empty;
 
         [Required]
         public DateTime BirthDate { get; set; } // Doğum tarihi
 
         [Required]
-        [MaxLength(10)]
-        public string Gender { get; set; } // Cinsiyet (örn: Erkek, Kadın)
+        [MaxLength(20)]
+        public string Gender { get; set; } = string.Empty;
 
-        [MaxLength(15)]
-        public string PhoneNumber { get; set; } // Telefon numarası
-
-        public string ProfilePicture { get; set; } // Profil fotoğrafı yolu veya URL'si
+        [MaxLength(300)]
+        public string? ProfilePicture { get; set; }
 
         // Rol alanı (Admin: 1, Kullanıcı: 0)
         [Required]
         public RoleType Role { get; set; } = RoleType.User;
+
+        public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAtUtc { get; set; }
+        public DateTime? DeletedAtUtc { get; set; }
+        public DateTime? AnonymizeAtUtc { get; set; }
+        public bool IsDeleted { get; set; }
+
+        [Timestamp]
+        public byte[]? RowVersion { get; set; }
 
         public ICollection<Score> Scores { get; set; } = new List<Score>();
 
         // Many-to-Many Relationship for Interests
         public ICollection<UserInterest> UserInterests { get; set; } = new List<UserInterest>();
         public ICollection<Mesaj> SentMessages { get; set; } = new List<Mesaj>(); // Gönderilen mesajlar
+        public ICollection<EventStaff> EventStaffAssignments { get; set; } = new List<EventStaff>();
 
     }
     public enum RoleType

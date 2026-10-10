@@ -10,7 +10,8 @@ namespace WebApplication1.Models
 
         [Required]
         [MaxLength(50)]
-        public string Name { get; set; } // Kategori Adı (örn: Spor, Müzik)
+        public string Name { get; set; } = string.Empty;
+        public bool IsArchived { get; set; }
 
         public ICollection<UserInterest> UserInterests { get; set; } = new List<UserInterest>(); // Kullanıcı İlişkisi
         public ICollection<EventCategory> EventCategories { get; set; } = new List<EventCategory>(); // Etkinlik İlişkisi

@@ -1,0 +1,12 @@
+@{
+    ViewData["Title"] = "İki adımlı doğrulama";
+}
+<div class="container py-5" style="max-width:480px">
+    <h1>İki adımlı doğrulama</h1>
+    @if (ViewBag.Error is string error) { <div class="alert alert-danger">@error</div> }
+    <form asp-action="TwoFactorLogin" method="post">
+        <label for="code" class="form-label">Authenticator kodu</label>
+        <input id="code" name="code" class="form-control" inputmode="numeric" autocomplete="one-time-code" required>
+        <button class="btn btn-primary mt-3" type="submit">Doğrula</button>
+    </form>
+</div>

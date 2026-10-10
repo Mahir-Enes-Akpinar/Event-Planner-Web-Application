@@ -1,0 +1,343 @@
+@model WebApplication1.Models.Etkinlik
+@using System.Security.Claims
+@using WebApplication1.Models
+@{
+    ViewData["Title"] = $"{Model.Name} Topluluğu";
+    Layout = "~/Views/Shared/UserLayout.cshtml";
+    var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    var isOwner = Model.CreatedByUserId == userId || User.IsInRole("Admin");
+    var isAssistant = Model.StaffMembers.Any(item => item.UserId == userId && item.Role == EventStaffRole.Assistant);
+    var isAttendanceOfficer = Model.StaffMembers.Any(item => item.UserId == userId && item.Role == EventStaffRole.AttendanceOfficer);
+    var canManageCommunity = isOwner || isAssistant;
+    var canTakeAttendance = isOwner || isAttendanceOfficer;
+    var ownParticipation = Model.Participants.FirstOrDefault(item => item.KullaniciId == userId);
+    var canShowQr = ownParticipation?.Status == ParticipationStatus.Registered;
+    var registeredParticipants = Model.Participants
+        .Where(item => item.Status is ParticipationStatus.Registered or ParticipationStatus.Attended)
+        .OrderBy(item => item.Kullanici.UserName)
+        .ToList();
+    var assignableParticipants = registeredParticipants
+        .Where(item => item.KullaniciId != Model.CreatedByUserId)
+        .ToList();
+    var messages = Model.Messages
+        .OrderByDescending(item => item.IsPinned)
+        .ThenByDescending(item => item.IsPinned ? item.PinnedAtUtc : item.SentDate)
+        .ThenBy(item => item.SentDate)
+        .ToList();
+}
+
+<style>
+    .community-shell{display:grid;gap:22px;padding-bottom:32px}
+    .community-hero{position:relative;overflow:hidden;padding:30px;border:1px solid rgba(255,255,255,.78);border-radius:30px;background:linear-gradient(135deg,rgba(109,93,252,.96),rgba(255,107,107,.88) 58%,rgba(255,183,3,.86));color:#fff;box-shadow:0 26px 70px rgba(51,35,114,.18)}
+    .community-hero h1{margin:0;font-weight:900;letter-spacing:-.055em}.community-hero p{max-width:760px;margin:10px 0 0;color:rgba(255,255,255,.8)}
+    .community-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(300px,.9fr);gap:20px}.community-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .community-card{padding:22px;border:1px solid rgba(255,255,255,.78);border-radius:26px;background:rgba(255,255,255,.76);box-shadow:0 22px 54px rgba(51,35,114,.1);backdrop-filter:blur(20px)}
+    .community-card h2{margin:0 0 8px;font-weight:900;letter-spacing:-.04em}.muted{color:var(--muted)}
+    .program-box{min-height:220px;padding:18px;border:1px solid #eee7ff;border-radius:20px;background:linear-gradient(135deg,#fff,#fff7ed);white-space:pre-wrap;line-height:1.7;color:#26314d}
+    .info-list{display:grid;gap:10px;margin-top:14px}.info-row{display:flex;justify-content:space-between;gap:12px;padding:12px;border:1px solid #eee7ff;border-radius:16px;background:rgba(255,255,255,.7)}.info-row span{color:var(--muted);font-weight:800}.info-row strong{text-align:right}
+    .participant-list{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}.participant-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 11px;border-radius:999px;background:#eef2ff;color:#4f46e5;font-weight:850}.avatar-dot{display:grid;place-items:center;width:30px;height:30px;border-radius:12px;color:#fff;background:linear-gradient(145deg,var(--primary),var(--accent));font-weight:900}
+    .message-list{display:grid;gap:12px;margin:16px 0}.community-message{padding:16px;border:1px solid rgba(232,229,245,.95);border-radius:20px;background:rgba(255,255,255,.82)}.community-message.pinned{border-color:rgba(255,183,3,.55);background:linear-gradient(135deg,#fff7ed,rgba(255,255,255,.9))}
+    .message-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.message-author{display:flex;align-items:center;gap:10px;font-weight:850}.message-time{color:var(--muted);font-size:.82rem}.message-content{margin-top:12px;color:#26314d;line-height:1.6;white-space:pre-wrap}
+    .role-badge,.pin-badge{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:999px;font-size:.74rem;font-weight:850}.role-badge{background:#eefdfb;color:#0f766e}.pin-badge{background:#fff7ed;color:#c2410c}
+    .pin-button{border:1px solid #eee7ff;border-radius:10px;background:#fff;color:#59657b;padding:7px 10px;font-weight:800}.pin-button:hover{color:#e11d48;background:#fff1f2}
+    .comment-box textarea{min-height:130px;border-color:#e4ddf5;border-radius:16px;background:rgba(255,255,255,.9)}
+    .qr-box{display:grid;place-items:center;min-height:230px;padding:16px;border:1px dashed #c7d2fe;border-radius:20px;background:#fff}.qr-box canvas,.qr-box img{max-width:100%}
+    .qr-token-fallback{display:none;margin-top:12px;padding:12px;border:1px solid #e0e7ff;border-radius:16px;background:#f8fbff;color:#334155;word-break:break-all;font-size:.82rem}
+    .scanner-actions{display:grid;grid-template-columns:1fr;gap:10px;margin-top:14px}.manual-scan-box{margin-top:12px;padding:12px;border:1px solid #eee7ff;border-radius:18px;background:rgba(248,250,252,.9)}
+    .camera-warning{display:none;margin-top:12px;padding:12px;border-radius:16px;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;font-weight:750}
+    #qr-reader{overflow:hidden;border:1px solid #eee7ff;border-radius:18px;background:#fff;min-height:220px}.staff-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #eee7ff}.staff-row:last-child{border-bottom:0}
+    @@media(max-width:950px){.community-grid,.community-grid.three{grid-template-columns:1fr}.community-hero{padding:24px}.community-card{padding:18px}}
+    @@media(max-width:640px){
+        .community-shell{gap:16px;margin-left:-8px;margin-right:-8px}
+        .community-hero{padding:22px 18px;border-radius:24px}.community-hero h1{font-size:1.85rem;letter-spacing:-.045em}.community-hero p{font-size:.95rem}
+        .community-card{padding:16px;border-radius:22px}.community-card h2{font-size:1.18rem}
+        .qr-box{min-height:210px}.btn-primary-modern,.btn{min-height:46px}
+        .info-row{display:grid;grid-template-columns:1fr;gap:4px}.info-row strong{text-align:left}
+        .message-top{display:grid}.pin-button{width:100%}.participant-chip{width:100%;justify-content:flex-start}
+    }
+</style>
+
+<main class="community-shell">
+    @if (TempData["SuccessMessage"] is string success) { <div class="alert alert-success" role="status">@success</div> }
+    @if (TempData["ErrorMessage"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
+
+    <section class="community-hero">
+        <div class="eyebrow text-white-50">Katılımcı alanı</div>
+        <h1>@Model.Name topluluğu</h1>
+        <p>Programı takip et, toplulukla konuş ve etkinlik zamanı QR yoklamayı buradan yönet.</p>
+    </section>
+
+    <section class="community-grid three">
+        @if (canShowQr)
+        {
+            <article class="community-card">
+                <h2>Yoklama QR kodum</h2>
+                <p class="muted">Etkinlik zamanı bu kodu kurucuya veya yoklama görevlisine okut.</p>
+                <div class="qr-box" id="participantQrBox"><span class="muted">QR oluşturmak için butona bas.</span></div>
+                <button class="btn-primary-modern w-100 mt-3" type="button" id="generateQrButton" data-event-id="@Model.Id">QR kodumu oluştur</button>
+                <div class="qr-token-fallback" id="qrTokenFallback">
+                    <strong>Kamera çalışmazsa:</strong>
+                    <div id="qrTokenText"></div>
+                </div>
+                <div class="small text-muted mt-2" id="qrStatus"></div>
+            </article>
+        }
+
+        @if (canTakeAttendance)
+        {
+            <article class="community-card">
+                <h2>QR yoklama al</h2>
+                <p class="muted">Katılımcının QR kodunu kamerayla okut.</p>
+                <form id="qrAntiForgeryForm">@Html.AntiForgeryToken()</form>
+                <div class="camera-warning" id="cameraWarning">
+                    Mobil tarayıcılar kamera için HTTPS ister. Telefonla http://192.168... üzerinden giriyorsan izin otomatik reddedilir.
+                </div>
+                <div id="qr-reader"></div>
+                <div class="scanner-actions">
+                    <button class="btn-primary-modern w-100" type="button" id="startScannerButton" data-event-id="@Model.Id">Kamerayı aç</button>
+                </div>
+                <div class="manual-scan-box">
+                    <label for="manualQrToken" class="form-label fw-semibold mb-1">Kamera açılmazsa QR kod metnini yapıştır</label>
+                    <div class="input-group">
+                        <input class="form-control" id="manualQrToken" autocomplete="off" placeholder="Katılımcının QR metni">
+                        <button class="btn btn-outline-primary" type="button" id="manualVerifyButton" data-event-id="@Model.Id">Doğrula</button>
+                    </div>
+                </div>
+                <div class="small text-muted mt-2" id="scanStatus"></div>
+            </article>
+        }
+
+        @if (isOwner)
+        {
+            <article class="community-card">
+                <h2>Görevli yönetimi</h2>
+                <p class="muted">Yardımcı topluluk yönetir, yoklama görevlisi QR okutabilir.</p>
+                <form asp-action="AssignEventStaff" method="post" class="row g-2">
+                    <input type="hidden" name="eventId" value="@Model.Id">
+                    <div class="col-12">
+                        <select class="form-select" name="userId" required>
+                            <option value="">Katılımcı seç</option>
+                            @foreach (var participant in assignableParticipants)
+                            {
+                                <option value="@participant.KullaniciId">@participant.Kullanici.UserName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <select class="form-select" name="role" required>
+                            <option value="@EventStaffRole.Assistant">Yardımcı</option>
+                            <option value="@EventStaffRole.AttendanceOfficer">Yoklama görevlisi</option>
+                        </select>
+                    </div>
+                    <div class="col-12"><button class="btn-primary-modern w-100" type="submit">Görev ata</button></div>
+                </form>
+                <div class="mt-3">
+                    @foreach (var staff in Model.StaffMembers.OrderBy(item => item.User.UserName).ThenBy(item => item.Role))
+                    {
+                        <div class="staff-row">
+                            <div><strong>@staff.User.UserName</strong><div class="small text-muted">@(staff.Role == EventStaffRole.Assistant ? "Yardımcı" : "Yoklama görevlisi")</div></div>
+                            <form asp-action="RemoveEventStaff" method="post">
+                                <input type="hidden" name="staffId" value="@staff.Id">
+                                <button class="btn btn-sm btn-outline-danger" type="submit">Kaldır</button>
+                            </form>
+                        </div>
+                    }
+                </div>
+            </article>
+        }
+    </section>
+
+    <section class="community-grid">
+        <article class="community-card">
+            <h2>Detaylı program</h2>
+            <p class="muted">Kurucunun etkinlik akışı ve önemli notları.</p>
+            @if (canManageCommunity)
+            {
+                <form asp-action="UpdateCommunityProgram" method="post">
+                    <input type="hidden" name="eventId" value="@Model.Id">
+                    <textarea class="form-control mb-3" name="detailedProgram" rows="8" maxlength="3000" placeholder="Saat saat programı, buluşma notlarını ve duyuruları yaz...">@Model.DetailedProgram</textarea>
+                    <button class="btn-primary-modern" type="submit">Programı kaydet</button>
+                </form>
+            }
+            else
+            {
+                <div class="program-box">@(string.IsNullOrWhiteSpace(Model.DetailedProgram) ? "Kurucu henüz detaylı program eklememiş." : Model.DetailedProgram)</div>
+            }
+        </article>
+
+        <aside class="community-card">
+            <h2>Etkinlik özeti</h2>
+            <div class="info-list">
+                <div class="info-row"><span>Tarih</span><strong>@Model.Date.ToString("dd MMM yyyy HH:mm")</strong></div>
+                <div class="info-row"><span>Süre</span><strong>@($"{(int)Model.Duration.TotalHours} saat {Model.Duration.Minutes} dk")</strong></div>
+                <div class="info-row"><span>Adres</span><strong>@Model.Location</strong></div>
+                <div class="info-row"><span>Kurucu</span><strong>@(Model.CreatedByUser?.UserName ?? "Bilinmiyor")</strong></div>
+            </div>
+            <h2 class="mt-4">Katılımcılar</h2>
+            <div class="participant-list">
+                @foreach (var participant in registeredParticipants)
+                {
+                    <span class="participant-chip"><span class="avatar-dot">@((participant.Kullanici.UserName ?? "?").Substring(0, 1).ToUpperInvariant())</span>@participant.Kullanici.UserName</span>
+                }
+            </div>
+        </aside>
+    </section>
+
+    <section class="community-card">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+            <div>
+                <h2>Topluluk sohbeti</h2>
+                <p class="muted mb-0">Sorular, buluşma notları ve duyurular burada.</p>
+            </div>
+            <a class="btn btn-light" asp-action="Details" asp-route-id="@Model.Id">Detaya dön</a>
+        </div>
+
+        @if (messages.Any())
+        {
+            <div class="message-list">
+                @foreach (var message in messages)
+                {
+                    var authorIsFounder = message.SenderId == Model.CreatedByUserId;
+                    <article class="community-message @(message.IsPinned ? "pinned" : "")">
+                        <div class="message-top">
+                            <div>
+                                <div class="message-author">
+                                    <span class="avatar-dot">@((message.Sender.UserName ?? "?").Substring(0, 1).ToUpperInvariant())</span>
+                                    <span>@message.Sender.UserName</span>
+                                    @if (authorIsFounder) { <span class="role-badge">Kurucu</span> }
+                                    @if (message.IsPinned) { <span class="pin-badge">Sabitli</span> }
+                                </div>
+                                <div class="message-time">@message.SentDate.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>
+                            </div>
+                            @if (canManageCommunity)
+                            {
+                                <form asp-action="TogglePinnedComment" method="post">
+                                    <input type="hidden" name="messageId" value="@message.Id">
+                                    <button class="pin-button" type="submit">@(message.IsPinned ? "Sabiti kaldır" : "Sabitle")</button>
+                                </form>
+                            }
+                        </div>
+                        <div class="message-content">@message.Content</div>
+                    </article>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="text-center text-muted py-4">Henüz mesaj yok. İlk topluluk mesajını sen yaz.</div>
+        }
+
+        <form class="comment-box" asp-action="AddComment" method="post">
+            <input type="hidden" name="etkinlikId" value="@Model.Id">
+            <input type="hidden" name="fromCommunity" value="true">
+            <label for="content" class="form-label fw-semibold">Topluluğa yaz</label>
+            <textarea id="content" name="content" class="form-control mb-3" maxlength="1000" placeholder="Duyuru, soru veya buluşma notu paylaş..." required></textarea>
+            <div class="d-flex justify-content-end"><button class="btn-primary-modern" type="submit">Gönder</button></div>
+        </form>
+    </section>
+</main>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script>
+        const qrButton = document.getElementById('generateQrButton');
+        const qrBox = document.getElementById('participantQrBox');
+        const qrStatus = document.getElementById('qrStatus');
+        const qrTokenFallback = document.getElementById('qrTokenFallback');
+        const qrTokenText = document.getElementById('qrTokenText');
+        qrButton?.addEventListener('click', async () => {
+            qrBox.innerHTML = '<span class="muted">QR hazırlanıyor...</span>';
+            qrStatus.textContent = '';
+            if (qrTokenFallback) qrTokenFallback.style.display = 'none';
+            const response = await fetch(`/Event/GenerateAttendanceQr?eventId=${encodeURIComponent(qrButton.dataset.eventId)}`);
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                qrBox.innerHTML = '<span class="muted">QR oluşturulamadı.</span>';
+                qrStatus.textContent = payload.message || 'Etkinlik zamanı henüz açılmamış olabilir.';
+                return;
+            }
+
+            qrBox.innerHTML = '';
+            new QRCode(qrBox, { text: payload.token, width: 210, height: 210, correctLevel: QRCode.CorrectLevel.M });
+            if (qrTokenText) qrTokenText.textContent = payload.token;
+            if (qrTokenFallback) qrTokenFallback.style.display = 'block';
+            qrStatus.textContent = 'Bu kod 5 dakika geçerlidir.';
+        });
+
+        const startScannerButton = document.getElementById('startScannerButton');
+        const scanStatus = document.getElementById('scanStatus');
+        const cameraWarning = document.getElementById('cameraWarning');
+        const manualQrToken = document.getElementById('manualQrToken');
+        const manualVerifyButton = document.getElementById('manualVerifyButton');
+        let scanner;
+        let scannerBusy = false;
+        if (cameraWarning && !window.isSecureContext) {
+            cameraWarning.style.display = 'block';
+        }
+
+        async function verifyAttendanceToken(eventId, token) {
+            const tokenInput = document.querySelector('#qrAntiForgeryForm input[name="__RequestVerificationToken"]');
+            const formData = new FormData();
+            formData.append('eventId', eventId);
+            formData.append('token', token);
+            const response = await fetch('/Event/VerifyAttendanceQr', {
+                method: 'POST',
+                headers: { 'RequestVerificationToken': tokenInput?.value || '' },
+                body: formData
+            });
+            const payload = await response.json().catch(() => ({}));
+            return { ok: response.ok, message: payload.message || (response.ok ? 'Yoklama alındı.' : 'QR doğrulanamadı.') };
+        }
+
+        manualVerifyButton?.addEventListener('click', async () => {
+            const token = manualQrToken?.value?.trim();
+            if (!token) {
+                scanStatus.textContent = 'Önce QR kod metnini yapıştır.';
+                return;
+            }
+            manualVerifyButton.disabled = true;
+            scanStatus.textContent = 'QR doğrulanıyor...';
+            const result = await verifyAttendanceToken(manualVerifyButton.dataset.eventId, token);
+            scanStatus.textContent = result.message;
+            if (result.ok && manualQrToken) manualQrToken.value = '';
+            manualVerifyButton.disabled = false;
+        });
+        startScannerButton?.addEventListener('click', async () => {
+            if (scanner) return;
+            if (!window.isSecureContext) {
+                scanStatus.textContent = 'Bu adres HTTP olduğu için mobil tarayıcı kamera iznini reddeder. HTTPS ile aç veya alttaki manuel doğrulamayı kullan.';
+                return;
+            }
+            if (!navigator.mediaDevices?.getUserMedia) {
+                scanStatus.textContent = 'Bu tarayıcı kamera erişimini desteklemiyor. Manuel doğrulamayı kullanabilirsin.';
+                return;
+            }
+            scanner = new Html5Qrcode('qr-reader');
+            scanStatus.textContent = 'Kamera açılıyor...';
+            try {
+                await scanner.start(
+                    { facingMode: 'environment' },
+                    { fps: 10, qrbox: { width: 240, height: 240 } },
+                    async decodedText => {
+                        if (scannerBusy) return;
+                        scannerBusy = true;
+                        scanStatus.textContent = 'QR doğrulanıyor...';
+                        const result = await verifyAttendanceToken(startScannerButton.dataset.eventId, decodedText);
+                        scanStatus.textContent = result.message;
+                        setTimeout(() => { scannerBusy = false; }, 1800);
+                    }
+                );
+                scanStatus.textContent = 'Kamera açık. Katılımcı QR kodunu okut.';
+            } catch (error) {
+                const name = error?.name || '';
+                if (name === 'NotAllowedError' || name === 'SecurityError') {
+                    scanStatus.textContent = 'Tarayıcı kamera iznini reddetti. Telefonda HTTPS gerekir; şimdilik manuel doğrulamayı kullan.';
+                } else {
+                    scanStatus.textContent = 'Kamera açılamadı. Başka uygulama kamerayı kullanıyor olabilir veya tarayıcı desteklemiyor.';
+                }
+                scanner = null;
+            }
+        });
+    </script>
+}

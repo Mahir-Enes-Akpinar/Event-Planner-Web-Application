@@ -12,10 +12,13 @@ namespace WebApplication1.Models
 
         [Required]
         [MaxLength(100)]
-        public string Name { get; set; } // Etkinlik adı
+        public string Name { get; set; } = string.Empty;
 
         [MaxLength(500)]
-        public string Description { get; set; } // Açıklama
+        public string? Description { get; set; }
+
+        [MaxLength(3000)]
+        public string? DetailedProgram { get; set; }
 
         [Required]
         public DateTime Date { get; set; } // Tarih
@@ -23,9 +26,17 @@ namespace WebApplication1.Models
         [Required]
         public TimeSpan Duration { get; set; } // Süre
 
-        public string Location { get; set; } // Konum
+        [Required, MaxLength(250)]
+        public string Location { get; set; } = string.Empty;
 
-        public string ImageUrl { get; set; } // Görsel URL'si
+        /// <summary>Null veya 0 ise sınırsız katılım anlamına gelir.</summary>
+        [Range(0, 100000)]
+        public int? MaxParticipants { get; set; }
+
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+
+        public string? ImageUrl { get; set; }
 
         [Required]
         public EventStatus Status { get; set; } = EventStatus.Pending; // Varsayılan: Bekliyor
@@ -35,7 +46,18 @@ namespace WebApplication1.Models
         public int CreatedByUserId { get; set; } // Etkinliği oluşturan kullanıcı ID
 
         [ForeignKey("CreatedByUserId")]
-        public Kullanici CreatedByUser { get; set; } // Etkinliği oluşturan kullanıcı ile ilişki
+        public Kullanici CreatedByUser { get; set; } = null!;
+
+        [MaxLength(500)]
+        public string? RejectionReason { get; set; }
+
+        public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAtUtc { get; set; }
+        public DateTime? DeletedAtUtc { get; set; }
+        public bool IsDeleted { get; set; }
+
+        [Timestamp]
+        public byte[]? RowVersion { get; set; }
 
 
         // Many-to-Many Relationship for Categories
@@ -43,6 +65,10 @@ namespace WebApplication1.Models
 
         // Participants Relationship
         public ICollection<Participant> Participants { get; set; } = new List<Participant>();
+
+        public ICollection<EventStaff> StaffMembers { get; set; } = new List<EventStaff>();
+
+        public ICollection<AttendanceQrToken> AttendanceQrTokens { get; set; } = new List<AttendanceQrToken>();
 
         public ICollection<Mesaj> Messages { get; set; } = new List<Mesaj>(); // Mesajlar
     }
@@ -52,6 +78,8 @@ namespace WebApplication1.Models
     {
         Pending,    // Onay bekliyor
         Approved,   // Onaylandı
-        Rejected    // Reddedildi
+        Rejected,   // Reddedildi
+        Cancelled,
+        Completed
     }
 }
