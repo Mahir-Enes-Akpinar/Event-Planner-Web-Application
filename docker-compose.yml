@@ -43,6 +43,9 @@ services:
       EmailSettings__SMTPUser: ${SMTP_USER:-}
       EmailSettings__SMTPPass: ${SMTP_PASSWORD:-}
       EmailSettings__FromEmail: ${SMTP_FROM:-}
+      EmailProvider: ${EMAIL_PROVIDER:-}
+      Resend__ApiKey: ${RESEND_API_KEY:-}
+      Resend__BaseUrl: ${RESEND_BASE_URL:-https://api.resend.com/}
       Geoapify__ServerApiKey: ${GEOAPIFY_SERVER_KEY:-}
       Geoapify__BrowserApiKey: ${GEOAPIFY_BROWSER_KEY:-}
       BootstrapAdmin__Email: ${BOOTSTRAP_ADMIN_EMAIL:-}

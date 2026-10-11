@@ -14,20 +14,17 @@ public class HomeController : Controller
     private readonly SignInManager<Kullanici> _signInManager;
     private readonly IEmailService _emailService;
     private readonly ILogger<HomeController> _logger;
-    private readonly IWebHostEnvironment _environment;
 
     public HomeController(
         UserManager<Kullanici> userManager,
         SignInManager<Kullanici> signInManager,
         IEmailService emailService,
-        ILogger<HomeController> logger,
-        IWebHostEnvironment environment)
+        ILogger<HomeController> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _emailService = emailService;
         _logger = logger;
-        _environment = environment;
     }
 
     [AllowAnonymous]
@@ -99,7 +96,7 @@ public class HomeController : Controller
         {
             UserName = userName.Trim(),
             Email = email.Trim(),
-            EmailConfirmed = _environment.IsDevelopment(),
+            EmailConfirmed = true,
             FirstName = "Belirtilmedi",
             LastName = "Belirtilmedi",
             BirthDate = new DateTime(1900, 1, 1),
@@ -115,17 +112,7 @@ public class HomeController : Controller
         }
 
         await _userManager.AddToRoleAsync(user, "User");
-        var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-        var confirmationUrl = Url.Action(nameof(ConfirmEmail), "Home",
-            new { userId = user.Id, token }, Request.Scheme)!;
-
-        await _emailService.SendAsync(user.Email!, "E-posta adresinizi doğrulayın",
-            $"Hesabınızı doğrulamak için bağlantıyı açın: {confirmationUrl}");
-
-        var registrationMessage = "Kayıt tamamlandı. E-posta doğrulama bağlantısı gönderildi.";
-        if (_environment.IsDevelopment())
-            registrationMessage += $" Yerel geliştirme bağlantısı: {confirmationUrl}";
-        TempData["SuccessMessage"] = registrationMessage;
+        TempData["SuccessMessage"] = "Kayıt tamamlandı. Giriş yapabilirsiniz.";
         return RedirectToAction(nameof(Index));
     }
 
@@ -211,7 +198,7 @@ public class HomeController : Controller
     public async Task<IActionResult> ForgotPassword(string email)
     {
         var user = await _userManager.FindByEmailAsync(email.Trim());
-        if (user is not null && await _userManager.IsEmailConfirmedAsync(user))
+        if (user is not null)
         {
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
             var resetUrl = Url.Action(nameof(VerifyCode), "Home",

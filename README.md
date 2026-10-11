@@ -34,8 +34,12 @@ dotnet ef migrations script --project WebApplication1/WebApplication1.csproj
 ## Yapılandırma
 
 Secret değerler repoya yazılmaz. Yapılandırma anahtarları `.env.example` içindedir. Geoapify
-server anahtarı yalnızca kullanılan API'lere kısıtlanmalıdır. SMTP ve bootstrap admin parolaları
-deployment secret store'dan verilmelidir.
+server anahtarı yalnızca kullanılan API'lere kısıtlanmalıdır. SMTP/Resend ve bootstrap admin
+parolaları deployment secret store'dan verilmelidir.
+
+Mail gönderimi için iki yol desteklenir: `EmailProvider=Resend` ve `Resend__ApiKey` verildiğinde
+Resend HTTP API kullanılır; aksi halde eski SMTP ayarları ile devam edilir. Render free tier'da
+SMTP portları zaman aşımına düşebildiği için production ortamında Resend tercih edilir.
 
 Yüklenen görseller `data/uploads`, Data Protection anahtarları `data/keys` altında tutulur.
 Bu path'ler yerelde Docker volume ile saklanır.
@@ -75,10 +79,18 @@ EmailSettings__SMTPPort=587
 EmailSettings__SMTPUser=<smtp user>
 EmailSettings__SMTPPass=<smtp password>
 EmailSettings__FromEmail=<from email>
+EmailSettings__FromName=Event Planner
+EmailProvider=Resend
+Resend__ApiKey=<resend api key>
+Resend__BaseUrl=https://api.resend.com/
 Geoapify__ServerApiKey=<optional server key>
 Storage__ImagePath=/app/data/uploads
 Storage__DataProtectionPath=/app/data/keys
 ```
+
+Resend kullanırken `EmailSettings__FromEmail` doğrulanmış bir Resend domain adresi olmalıdır.
+Domain henüz doğrulanmadıysa test için Resend'in izin verdiği test sender adresini kullanın;
+aksi halde outbox kayıtları `LastError` alanında domain/sender hatası ile kalır.
 
 Render `PORT` variable'ını otomatik verir; uygulama container içinde `0.0.0.0:$PORT`
 üzerinden dinler.

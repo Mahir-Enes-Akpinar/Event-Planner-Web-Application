@@ -36,9 +36,8 @@ builder.Services.AddDbContext<Context>(options =>
 builder.Services
     .AddIdentity<Kullanici, IdentityRole<int>>(options =>
     {
-        // Local Docker development should not block registration when SMTP is not configured.
-        // Production keeps mandatory email confirmation.
-        options.SignIn.RequireConfirmedEmail = !builder.Environment.IsDevelopment();
+        // Email verification is disabled so registration/login does not depend on an external mail provider.
+        options.SignIn.RequireConfirmedEmail = false;
         options.Password.RequiredLength = 10;
         options.Password.RequireDigit = true;
         options.Password.RequireLowercase = true;
