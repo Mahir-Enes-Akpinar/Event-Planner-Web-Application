@@ -105,7 +105,7 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.AddScoped<IPasswordHasher<Kullanici>, LegacyCompatiblePasswordHasher>();
-builder.Services.AddSingleton<IImageStorage, LocalImageStorage>();
+builder.Services.AddScoped<IImageStorage, LocalImageStorage>();
 builder.Services.AddHttpClient<GeoapifyService>((services, client) =>
 {
     var configuration = services.GetRequiredService<IConfiguration>();

@@ -106,11 +106,16 @@ Manuel migration için:
 dotnet ef database update --project WebApplication1/WebApplication1.csproj
 ```
 
-### Render filesystem uyarısı
+### Upload storage
 
-Mevcut upload sistemi profil ve etkinlik görsellerini local diske yazar. Render filesystem'i
-persistent disk bağlanmadıkça kalıcı kabul edilmemelidir. Kalıcı görsel saklama için ileride
-Cloudinary, S3 veya benzeri bir storage servisine geçilmelidir.
+Profil ve etkinlik görselleri `/media/{fileName}` URL'i ile gösterilir. Dosya geçici olarak
+`Storage__ImagePath` altına yazılır, ayrıca PostgreSQL'deki `StoredImages` tablosuna `bytea`
+olarak kaydedilir. Render filesystem'i kalıcı olmasa bile redeploy/restart sonrasında `/media`
+isteği geldiğinde dosya veritabanından geri oluşturulur.
+
+Büyük trafik veya yüksek görsel hacmi için ileride Cloudinary, S3 veya benzeri object storage'a
+geçmek daha doğru olur; mevcut yapı küçük/orta ölçekli deployment için Supabase PostgreSQL'i
+kalıcı storage olarak kullanır.
 
 ### Deploy sonrası test
 

@@ -678,6 +678,29 @@ namespace WebApplication1.Migrations.Postgres
                     b.ToTable("Puanlar");
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.StoredImage", b =>
+                {
+                    b.Property<string>("FileName")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("FileName");
+
+                    b.ToTable("StoredImages");
+                });
+
             modelBuilder.Entity("EventCategory", b =>
                 {
                     b.HasOne("WebApplication1.Models.Etkinlik", "Etkinlik")

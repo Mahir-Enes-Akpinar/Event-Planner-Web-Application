@@ -19,6 +19,7 @@ public class Context : IdentityDbContext<Kullanici, IdentityRole<int>, int>
     public DbSet<EmailOutboxMessage> EmailOutbox => Set<EmailOutboxMessage>();
     public DbSet<EventStaff> EventStaff => Set<EventStaff>();
     public DbSet<AttendanceQrToken> AttendanceQrTokens => Set<AttendanceQrToken>();
+    public DbSet<StoredImage> StoredImages => Set<StoredImage>();
     public DbSet<Kullanici> Kullanicilar => Users;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -46,6 +47,14 @@ public class Context : IdentityDbContext<Kullanici, IdentityRole<int>, int>
         });
 
         modelBuilder.Entity<Kategori>().HasIndex(category => category.Name).IsUnique();
+
+        modelBuilder.Entity<StoredImage>(entity =>
+        {
+            entity.HasKey(item => item.FileName);
+            entity.Property(item => item.FileName).HasMaxLength(50);
+            entity.Property(item => item.ContentType).HasMaxLength(50);
+            entity.Property(item => item.Content).IsRequired();
+        });
 
         modelBuilder.Entity<UserInterest>(entity =>
         {

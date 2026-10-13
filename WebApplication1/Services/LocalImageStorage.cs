@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using WebApplication1.Models;
+
 namespace WebApplication1.Services;
 
 public sealed class LocalImageStorage : IImageStorage
@@ -11,9 +14,11 @@ public sealed class LocalImageStorage : IImageStorage
         };
 
     private readonly string _storageRoot;
+    private readonly Context _database;
 
-    public LocalImageStorage(IWebHostEnvironment environment, IConfiguration configuration)
+    public LocalImageStorage(IWebHostEnvironment environment, IConfiguration configuration, Context database)
     {
+        _database = database;
         var configuredPath = configuration["Storage:ImagePath"];
         _storageRoot = string.IsNullOrWhiteSpace(configuredPath)
             ? Path.Combine(environment.ContentRootPath, "data", "uploads")
@@ -42,9 +47,20 @@ public sealed class LocalImageStorage : IImageStorage
 
         var fileName = $"{Guid.NewGuid():N}{signature.Value.Extension}";
         var target = Path.Combine(_storageRoot, fileName);
-        await using var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None,
-            81920, FileOptions.Asynchronous);
-        await file.CopyToAsync(output, cancellationToken);
+        await using var memory = new MemoryStream((int)file.Length);
+        await file.CopyToAsync(memory, cancellationToken);
+        var content = memory.ToArray();
+
+        await File.WriteAllBytesAsync(target, content, cancellationToken);
+
+        _database.StoredImages.Add(new StoredImage
+        {
+            FileName = fileName,
+            ContentType = signature.Value.ContentType,
+            Content = content,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
         return $"/media/{fileName}";
     }
 
@@ -65,6 +81,16 @@ public sealed class LocalImageStorage : IImageStorage
         if (contentType.Length == 0) return false;
 
         path = Path.Combine(_storageRoot, fileName);
+        if (File.Exists(path)) return true;
+
+        var storedImage = _database.StoredImages
+            .AsNoTracking()
+            .FirstOrDefault(item => item.FileName == fileName);
+        if (storedImage is null) return false;
+
+        Directory.CreateDirectory(_storageRoot);
+        File.WriteAllBytes(path, storedImage.Content);
+        contentType = storedImage.ContentType;
         return File.Exists(path);
     }
 }
