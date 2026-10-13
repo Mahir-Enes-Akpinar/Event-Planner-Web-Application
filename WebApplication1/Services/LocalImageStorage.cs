@@ -14,9 +14,9 @@ public sealed class LocalImageStorage : IImageStorage
         };
 
     private readonly string _storageRoot;
-    private readonly Context _database;
+    private readonly Context? _database;
 
-    public LocalImageStorage(IWebHostEnvironment environment, IConfiguration configuration, Context database)
+    public LocalImageStorage(IWebHostEnvironment environment, IConfiguration configuration, Context? database = null)
     {
         _database = database;
         var configuredPath = configuration["Storage:ImagePath"];
@@ -53,7 +53,7 @@ public sealed class LocalImageStorage : IImageStorage
 
         await File.WriteAllBytesAsync(target, content, cancellationToken);
 
-        _database.StoredImages.Add(new StoredImage
+        _database?.StoredImages.Add(new StoredImage
         {
             FileName = fileName,
             ContentType = signature.Value.ContentType,
@@ -82,6 +82,8 @@ public sealed class LocalImageStorage : IImageStorage
 
         path = Path.Combine(_storageRoot, fileName);
         if (File.Exists(path)) return true;
+
+        if (_database is null) return false;
 
         var storedImage = _database.StoredImages
             .AsNoTracking()
